@@ -1,0 +1,1016 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dungeon Arena - Team Combat</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  background: #0d0d0d;
+  background-image: radial-gradient(circle at 50% 50%, #1a1510 0%, #0d0d0d 70%);
+  color: #d4c5a0;
+  font-family: 'Segoe UI', system-ui, sans-serif;
+  height: 100vh;
+  display: flex; justify-content: center; align-items: center;
+}
+#game {
+  width: 980px; height: 700px;
+  display: flex; flex-direction: column;
+  border: 2px solid #3a2a1a; border-radius: 8px; overflow: hidden;
+  background: #1a1410;
+}
+#score-bar {
+  text-align: center; font-size: 12px; color: #7a6a4a;
+  padding: 4px; background: #0a0a08;
+  border-bottom: 1px solid #2a2010;
+}
+#battle-scene {
+  flex: 1; position: relative; min-height: 280px;
+  background: linear-gradient(180deg, #1a1018 0%, #1a1520 25%, #181818 50%, #2a2218 75%, #1a1a10 100%);
+  overflow: hidden; display: flex;
+}
+#battle-scene::after {
+  content: ''; position: absolute; bottom: 0; left: 0; right: 0; height: 40%;
+  background:
+    repeating-linear-gradient(90deg, rgba(255,255,255,0.02) 0px, rgba(255,255,255,0.02) 1px, transparent 1px, transparent 60px),
+    repeating-linear-gradient(0deg, rgba(255,255,255,0.015) 0px, rgba(255,255,255,0.015) 1px, transparent 1px, transparent 40px);
+  pointer-events: none;
+}
+#battle-scene::before {
+  content: ''; position: absolute; inset: 0;
+  background: radial-gradient(ellipse at 20% 30%, rgba(255,150,50,0.06) 0%, transparent 50%),
+              radial-gradient(ellipse at 80% 40%, rgba(255,100,50,0.04) 0%, transparent 50%);
+  animation: flicker 3s ease-in-out infinite alternate;
+  pointer-events: none;
+}
+@keyframes flicker { 0% { opacity: 0.7; } 50% { opacity: 1; } 100% { opacity: 0.8; } }
+
+/* Team Rosters */
+.team-roster {
+  width: 105px; display: flex; flex-direction: column; gap: 4px;
+  padding: 8px 6px; z-index: 15; flex-shrink: 0;
+}
+.team-roster.player-roster { border-right: 1px solid #2a2010; background: rgba(10,10,8,0.5); }
+.team-roster.opp-roster { border-left: 1px solid #2a2010; background: rgba(10,10,8,0.5); }
+.roster-entry {
+  background: #1a1510; border: 1px solid #3a2a1a; border-radius: 4px;
+  padding: 4px 6px; font-size: 9px; cursor: default; transition: border-color 0.2s;
+  position: relative;
+}
+.roster-entry.active { border-color: #8a6a3a; background: #2a2018; }
+.roster-entry.fainted { opacity: 0.4; }
+.roster-entry.switchable { cursor: pointer; }
+.roster-entry.switchable:hover { border-color: #aa8a4a; background: #2a2518; }
+.roster-name { font-weight: 700; font-size: 10px; color: #e8d8b0; }
+.roster-class { color: #7a6a4a; font-size: 8px; }
+.roster-hp-bar { height: 4px; background: #1a1208; border-radius: 2px; margin-top: 2px; overflow: hidden; }
+.roster-hp-fill { height: 100%; background: #6a8a3a; border-radius: 2px; transition: width 0.4s; }
+.roster-hp-fill.yellow { background: #aa8a2a; }
+.roster-hp-fill.red { background: #aa3a2a; }
+
+/* Battle Area */
+#arena { flex: 1; position: relative; }
+.monster-platform {
+  position: absolute; width: 120px; height: 16px; border-radius: 50%;
+  background: radial-gradient(ellipse, rgba(0,0,0,0.3) 0%, transparent 70%);
+}
+.opponent-area { position: absolute; top: 30px; right: 100px; z-index: 5; }
+.opponent-area .monster-platform { bottom: -8px; left: 50%; transform: translateX(-50%); }
+.player-area { position: absolute; bottom: 55px; left: 80px; }
+.player-area .monster-platform { bottom: -8px; left: 50%; transform: translateX(-50%); width: 140px; }
+.monster-sprite {
+  width: 96px; height: 96px; image-rendering: pixelated;
+  transition: transform 0.15s, opacity 0.3s, filter 0.15s;
+}
+.player-area .monster-sprite { width: 112px; height: 112px; }
+.monster-sprite.hit { animation: shake 0.3s; filter: brightness(2) saturate(0); }
+.monster-sprite.attacking { animation: lunge 0.3s; }
+.monster-sprite.fainted { opacity: 0; transform: translateY(40px); transition: all 0.6s; }
+.monster-sprite.entering { animation: slideIn 0.4s ease-out; }
+@keyframes shake { 0%,100% { transform: translateX(0); } 25% { transform: translateX(-8px); } 50% { transform: translateX(8px); } 75% { transform: translateX(-4px); } }
+@keyframes lunge { 0%,100% { transform: translateX(0); } 50% { transform: translateX(20px) translateY(-10px); } }
+@keyframes slideIn { 0% { opacity: 0; transform: translateY(30px); } 100% { opacity: 1; transform: translateY(0); } }
+.dmg-float {
+  position: absolute; font-weight: 900; font-size: 22px;
+  pointer-events: none; z-index: 50;
+  text-shadow: 1px 1px 2px #000, -1px -1px 2px #000;
+  animation: floatUp 1s ease-out forwards;
+}
+.dmg-float.crit { font-size: 28px; color: #ffcc00 !important; }
+.dmg-float.heal { color: #6aaa5a !important; }
+@keyframes floatUp { 0% { opacity: 1; transform: translateY(0); } 100% { opacity: 0; transform: translateY(-50px); } }
+
+/* HP Boxes */
+.hp-box {
+  position: absolute; z-index: 10;
+  background: linear-gradient(135deg, #1a1510 0%, #2a2018 100%);
+  border: 2px solid #4a3a20; border-radius: 6px;
+  padding: 8px 12px; min-width: 220px;
+}
+.hp-box.opponent { top: 15px; left: 15px; }
+.hp-box.player { bottom: 30px; right: 15px; }
+.hp-box .name { font-weight: 700; font-size: 14px; color: #e8d8b0; }
+.hp-box .class-label { font-size: 11px; color: #8a7a5a; margin-left: 6px; }
+.hp-box .level { font-size: 11px; color: #7a6a4a; float: right; }
+.stat-row { display: flex; gap: 4px; margin-top: 3px; font-size: 9px; color: #6a5a3a; flex-wrap: wrap; }
+.stat-row span { background: #1a1208; padding: 1px 4px; border-radius: 2px; }
+.type-row { font-size: 9px; margin-top: 2px; }
+.type-row .resist-tag { color: #5a8a5a; }
+.type-row .vuln-tag { color: #aa6a3a; }
+.hp-bar-container { background: #1a1208; border-radius: 3px; height: 8px; overflow: hidden; margin-top: 4px; border: 1px solid #3a2a1a; }
+.hp-bar { height: 100%; border-radius: 3px; transition: width 0.5s ease, background 0.3s; background: #6a8a3a; }
+.hp-bar.yellow { background: #aa8a2a; }
+.hp-bar.red { background: #aa3a2a; }
+.hp-text { font-size: 10px; text-align: right; margin-top: 2px; color: #6a5a3a; }
+.status-badge { display: inline-block; font-size: 9px; padding: 1px 5px; border-radius: 3px; margin-left: 6px; font-weight: 700; }
+.status-badge.poison { background: #2a4a1a; color: #6a4; }
+.status-badge.stun { background: #4a4a1a; color: #aa8; }
+.status-badge.slow { background: #1a2a4a; color: #68a; }
+
+/* Bottom Panel */
+#bottom-panel { height: 240px; display: flex; background: #12100c; border-top: 2px solid #3a2a1a; }
+#battle-log {
+  flex: 1; padding: 10px 14px; overflow-y: auto;
+  font-size: 12px; line-height: 1.6;
+  border-right: 2px solid #2a2010;
+  scroll-behavior: smooth; font-family: 'Georgia', serif;
+}
+#battle-log .log-line { margin-bottom: 2px; }
+#battle-log .damage { color: #cc6644; }
+#battle-log .heal { color: #6aaa5a; }
+#battle-log .info { color: #8a9aaa; }
+#battle-log .crit { color: #ddaa33; font-weight: 700; }
+#battle-log .miss { color: #666; font-style: italic; }
+#battle-log .resist { color: #777; }
+#battle-log .vuln { color: #dd8833; }
+#battle-log .status { color: #aa77cc; }
+#battle-log .faint { color: #cc5544; font-weight: 700; }
+#battle-log .win { color: #ddaa33; font-weight: 700; font-size: 14px; }
+#battle-log .divider { color: #444; border-top: 1px solid #2a2010; padding-top: 4px; margin-top: 6px; }
+#battle-log .roll { color: #6688aa; font-size: 11px; }
+#battle-log .switch { color: #8ab; }
+
+#controls { width: 370px; padding: 8px; display: flex; flex-direction: column; gap: 5px; }
+#move-buttons { display: grid; grid-template-columns: 1fr 1fr; gap: 5px; flex: 1; }
+.move-btn {
+  border: 2px solid #3a2a1a; border-radius: 6px;
+  padding: 7px; cursor: pointer;
+  font-size: 12px; font-weight: 600; color: #e8d8b0;
+  text-align: left; display: flex; flex-direction: column; justify-content: center;
+  transition: filter 0.15s, transform 0.1s;
+  position: relative;
+}
+.move-btn:hover { filter: brightness(1.25); transform: scale(1.02); }
+.move-btn:active { transform: scale(0.98); }
+.move-btn:disabled { opacity: 0.35; cursor: not-allowed; transform: none; filter: none; }
+.move-btn .move-name { font-size: 13px; }
+.move-btn .move-info { font-size: 9px; opacity: 0.75; margin-top: 2px; }
+.move-btn[data-dmg="physical"] { background: #4a3a2a; }
+.move-btn[data-dmg="magical"] { background: #2a2a4a; }
+.move-btn[data-dmg="elemental"] { background: #4a3a1a; }
+.move-btn[data-dmg="divine"] { background: #4a4a1a; }
+.move-btn[data-dmg="curse"] { background: #3a1a3a; }
+.move-btn[data-dmg="heal"] { background: #2a4a2a; }
+
+#action-bar { display: flex; gap: 5px; align-items: center; }
+#action-bar button {
+  flex: 1; padding: 7px;
+  border: 2px solid #3a2a1a; border-radius: 6px;
+  background: #1a1510; color: #b0a080;
+  font-size: 12px; font-weight: 600; cursor: pointer;
+  transition: background 0.15s;
+}
+#action-bar button:hover { background: #2a2018; }
+#action-bar button.active { background: #3a2a18; border-color: #8a6a3a; color: #e8d8b0; }
+#speed-control {
+  display: flex; align-items: center; gap: 4px;
+  font-size: 10px; color: #7a6a4a; padding: 2px 0;
+}
+#speed-control input[type=range] { width: 60px; accent-color: #8a6a3a; }
+
+/* Tooltip */
+#tooltip {
+  display: none; position: fixed; z-index: 1000;
+  background: linear-gradient(135deg, #1a1510 0%, #222018 100%);
+  border: 2px solid #5a4a2a; border-radius: 8px;
+  padding: 10px 12px; width: 260px;
+  font-size: 11px; color: #d4c5a0;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.6);
+  pointer-events: none;
+}
+#tooltip .tt-name { font-size: 14px; font-weight: 700; color: #e8d8b0; margin-bottom: 4px; }
+#tooltip .tt-type { font-size: 10px; font-weight: 600; padding: 2px 6px; border-radius: 3px; display: inline-block; margin-bottom: 6px; }
+#tooltip .tt-type.physical { background: #4a3a2a; color: #d4a870; }
+#tooltip .tt-type.magical { background: #2a2a4a; color: #a0a0e0; }
+#tooltip .tt-type.elemental { background: #4a3a1a; color: #e0b060; }
+#tooltip .tt-type.divine { background: #4a4a1a; color: #e0d060; }
+#tooltip .tt-type.curse { background: #3a1a3a; color: #c080c0; }
+#tooltip .tt-type.heal { background: #2a4a2a; color: #80c080; }
+#tooltip .tt-stats { display: flex; flex-direction: column; gap: 3px; margin-bottom: 6px; }
+#tooltip .tt-stat { display: flex; justify-content: space-between; }
+#tooltip .tt-stat-label { color: #8a7a5a; }
+#tooltip .tt-stat-val { color: #d4c5a0; font-weight: 600; }
+#tooltip .tt-desc { font-style: italic; color: #9a8a6a; font-size: 10px; border-top: 1px solid #2a2010; padding-top: 6px; margin-top: 2px; }
+#tooltip .tt-variance { font-size: 10px; font-weight: 600; margin-top: 4px; }
+#tooltip .tt-variance.low { color: #6a8a5a; }
+#tooltip .tt-variance.med { color: #aa8a3a; }
+#tooltip .tt-variance.high { color: #cc6644; }
+#tooltip .tt-variance.extreme { color: #cc4444; }
+#tooltip .tt-effectiveness { font-size: 10px; font-weight: 700; margin-top: 4px; padding: 2px 0; }
+#tooltip .tt-effectiveness.super { color: #dd8833; }
+#tooltip .tt-effectiveness.resisted { color: #777; }
+#tooltip .tt-range-bar { height: 6px; background: #1a1208; border-radius: 3px; margin-top: 4px; position: relative; overflow: visible; }
+#tooltip .tt-range-fill { position: absolute; height: 100%; background: #4a6a3a; border-radius: 3px; }
+#tooltip .tt-range-avg { position: absolute; width: 2px; height: 10px; top: -2px; background: #e8d8b0; }
+#tooltip .tt-range-labels { display: flex; justify-content: space-between; font-size: 9px; color: #6a5a3a; margin-top: 2px; }
+</style>
+</head>
+<body>
+<div id="game">
+  <div id="score-bar">Victories: <span id="p-wins">0</span> | Defeats: <span id="p-losses">0</span> | Encounter #<span id="battle-num">1</span></div>
+  <div id="battle-scene">
+    <div class="team-roster player-roster" id="player-roster"></div>
+    <div id="arena">
+      <div class="hp-box opponent">
+        <span class="name" id="opp-name">???</span>
+        <span class="class-label" id="opp-class"></span>
+        <span class="level" id="opp-level"></span>
+        <div class="stat-row" id="opp-stats"></div>
+        <div class="type-row" id="opp-types"></div>
+        <div class="hp-bar-container"><div class="hp-bar" id="opp-hp-bar"></div></div>
+        <div class="hp-text" id="opp-hp-text">???/???</div>
+      </div>
+      <div class="opponent-area">
+        <canvas class="monster-sprite" id="opp-sprite" width="96" height="96"></canvas>
+        <div class="monster-platform"></div>
+      </div>
+      <div class="player-area">
+        <canvas class="monster-sprite" id="player-sprite" width="112" height="112"></canvas>
+        <div class="monster-platform"></div>
+      </div>
+      <div class="hp-box player">
+        <span class="name" id="player-name">???</span>
+        <span class="class-label" id="player-class"></span>
+        <span class="level" id="player-level"></span>
+        <div class="stat-row" id="player-stats"></div>
+        <div class="type-row" id="player-types"></div>
+        <div class="hp-bar-container"><div class="hp-bar" id="player-hp-bar"></div></div>
+        <div class="hp-text" id="player-hp-text">???/???</div>
+      </div>
+    </div>
+    <div class="team-roster opp-roster" id="opp-roster"></div>
+  </div>
+  <div id="bottom-panel">
+    <div id="battle-log"></div>
+    <div id="controls">
+      <div id="move-buttons"></div>
+      <div id="action-bar">
+        <button id="btn-fight">Fight</button>
+        <button id="btn-auto">Auto Battle</button>
+      </div>
+      <div id="speed-control">
+        <span>Speed:</span>
+        <input type="range" id="speed-slider" min="50" max="1000" value="500" step="50">
+        <span id="speed-label">500ms</span>
+      </div>
+    </div>
+  </div>
+</div>
+<div id="tooltip"></div>
+
+<script>
+// ============================================================
+//  HELPERS
+// ============================================================
+function mod(score) { return Math.floor((score - 10) / 2); }
+function d(n) { return Math.floor(Math.random() * n) + 1; }
+function rollDice(count, sides) { let t = 0; for (let i = 0; i < count; i++) t += d(sides); return t; }
+function delay(ms) { return new Promise(r => setTimeout(r, ms)); }
+function shadeColor(c, p) { const n=parseInt(c.replace('#',''),16); const r=Math.min(255,Math.max(0,(n>>16)+p)); const g=Math.min(255,Math.max(0,((n>>8)&0xFF)+p)); const b=Math.min(255,Math.max(0,(n&0xFF)+p)); return '#'+(0x1000000+r*0x10000+g*0x100+b).toString(16).slice(1); }
+function hashStr(s) { let h=0; for(let i=0;i<s.length;i++){h=((h<<5)-h)+s.charCodeAt(i);h|=0;} return Math.abs(h); }
+function mulberry32(a) { return function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296;}; }
+function pick(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
+function shuffle(arr) { const a=[...arr]; for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];} return a; }
+
+// ============================================================
+//  DAMAGE TYPES & EFFECTIVENESS
+//  Cycle: Physical > Curse > Divine > Elemental > Magical > Physical
+// ============================================================
+const DMG_TYPES = ['physical','magical','elemental','divine','curse'];
+const TYPE_STRONG = { physical:'curse', curse:'divine', divine:'elemental', elemental:'magical', magical:'physical' };
+const TYPE_LABELS = { physical:'Physical', magical:'Magical', elemental:'Elemental', divine:'Divine', curse:'Curse', heal:'Heal' };
+const TYPE_ICONS = { physical:'\u2694', magical:'\u2728', elemental:'\u26A1', divine:'\u2600', curse:'\u2620', heal:'\u2764' };
+
+function getEffectiveness(atkType, defResist, defVuln) {
+  if (atkType === 'heal') return 1;
+  if (atkType === defVuln) return 1.5;
+  if (atkType === defResist) return 0.5;
+  return 1;
+}
+
+// ============================================================
+//  ABILITIES - Higher expected damage = more dice sides, fewer dice = higher variance
+// ============================================================
+const ABILITIES = {
+  // PHYSICAL — All pure damage ≈11 avg (before stat mod). Variance differs by dice shape.
+  swordSlash:   { name:'Sword Slash',     dmgType:'physical', stat:'str', dice:[4,4], bonus:1, acc:1,  uses:20, desc:'Reliable quick slashes. Very consistent damage output.' },
+  shieldBash:   { name:'Shield Bash',     dmgType:'physical', stat:'str', dice:[2,6], bonus:1, acc:0,  uses:14, desc:'Heavy shield strike. Lower damage but may stun the target.', effect:'stun' },
+  execute:      { name:'Execute',         dmgType:'physical', stat:'str', dice:[1,20],bonus:1, acc:-1, uses:5,  desc:'Devastating finishing blow. Same average damage but wildly unpredictable.' },
+  cleave:       { name:'Cleave',          dmgType:'physical', stat:'str', dice:[2,10],bonus:0, acc:0,  uses:10, desc:'Wide sweeping slash. High variance — big hits or weak swings.' },
+  quickStrike:  { name:'Quick Strike',    dmgType:'physical', stat:'dex', dice:[6,2], bonus:2, acc:2,  uses:22, desc:'Rapid precise jabs. Extremely consistent and hard to dodge.' },
+  backstab:     { name:'Backstab',        dmgType:'physical', stat:'dex', dice:[1,18],bonus:2, acc:0,  uses:8,  desc:'Strike from shadows. High variance — massive hit or barely a scratch.' },
+  ragingBlow:   { name:'Raging Blow',     dmgType:'physical', stat:'str', dice:[1,22],bonus:0, acc:-1, uses:5,  desc:'Berserk overhand strike. Maximum variance — true feast or famine.' },
+  flurry:       { name:'Flurry of Blows', dmgType:'physical', stat:'dex', dice:[5,3], bonus:1, acc:1,  uses:20, desc:'Rapid combination strikes. Very consistent and reliable.' },
+  crossbow:     { name:'Crossbow Shot',   dmgType:'physical', stat:'dex', dice:[2,8], bonus:2, acc:1,  uses:15, desc:'Precise ranged bolt. Moderate variance, good accuracy.' },
+  // MAGICAL — Same avg damage, different variance. Auto-hit trades damage for reliability.
+  arcaneBolt:   { name:'Arcane Bolt',     dmgType:'magical',  stat:'int', dice:[4,4], bonus:1, acc:1,  uses:20, desc:'Focused arcane energy. Consistent and reliable.' },
+  arcaneBarrage:{ name:'Arcane Barrage',  dmgType:'magical',  stat:'int', dice:[2,10],bonus:0, acc:0,  uses:10, desc:'Volley of magical projectiles. Same average, wider spread.' },
+  disintegrate: { name:'Disintegrate',    dmgType:'magical',  stat:'int', dice:[1,22],bonus:0, acc:-1, uses:4,  desc:'Beam of pure destruction. Can obliterate or fizzle completely.' },
+  arcaneMissile:{ name:'Arcane Missiles', dmgType:'magical',  stat:'int', dice:[6,2], bonus:0, acc:99, uses:15, desc:'Unerring bolts. Always hits, always consistent. Lower damage for guaranteed value.' },
+  chaosBolt:    { name:'Chaos Bolt',      dmgType:'magical',  stat:'cha', dice:[1,18],bonus:2, acc:0,  uses:8,  desc:'Unstable magical energy. High variance chaotic damage.' },
+  kiBlast:      { name:'Ki Blast',        dmgType:'magical',  stat:'wis', dice:[3,5], bonus:2, acc:0,  uses:16, desc:'Focused spiritual energy. Moderate variance.' },
+  // ELEMENTAL — Status moves (slow) trade damage for crowd control.
+  fireBolt:     { name:'Fire Bolt',       dmgType:'elemental',stat:'int', dice:[4,4], bonus:1, acc:1,  uses:20, desc:'Small bolt of flame. Consistent elemental damage.' },
+  lightning:    { name:'Lightning Strike', dmgType:'elemental',stat:'int', dice:[2,10],bonus:0, acc:0,  uses:10, desc:'Crackling bolt. Same average damage, much swingier.' },
+  meteor:       { name:'Meteor Strike',   dmgType:'elemental',stat:'int', dice:[1,22],bonus:0, acc:-1, uses:4,  desc:'Call down a meteor. Maximum variance — devastating or disappointing.' },
+  iceShards:    { name:'Ice Shards',      dmgType:'elemental',stat:'int', dice:[2,6], bonus:1, acc:1,  uses:15, desc:'Razor-sharp ice. Lower damage but may slow the target.', effect:'slow' },
+  thornWhip:    { name:'Thorn Whip',      dmgType:'elemental',stat:'wis', dice:[4,4], bonus:1, acc:1,  uses:20, desc:'Thorny vine lash. Reliable nature damage.' },
+  earthquake:   { name:'Earthquake',      dmgType:'elemental',stat:'wis', dice:[1,20],bonus:1, acc:-1, uses:5,  desc:'Shake the ground. Huge variance in impact.' },
+  naturesWrath: { name:"Nature's Wrath",  dmgType:'elemental',stat:'wis', dice:[2,8], bonus:2, acc:0,  uses:12, desc:'Channel nature fury. Moderate variance, solid damage.' },
+  // DIVINE — Same balance: consistent vs swingy, with effects costing damage.
+  sacredFlame:  { name:'Sacred Flame',    dmgType:'divine',   stat:'wis', dice:[4,4], bonus:1, acc:1,  uses:20, desc:'Steady beam of holy light. Consistent divine damage.' },
+  guidingBolt:  { name:'Guiding Bolt',    dmgType:'divine',   stat:'wis', dice:[2,10],bonus:0, acc:1,  uses:10, desc:'Brilliant divine bolt. Good accuracy but high variance.' },
+  judgment:     { name:'Divine Judgment',  dmgType:'divine',   stat:'wis', dice:[1,22],bonus:0, acc:-1, uses:4,  desc:'Heavenly wrath. Maximum variance — glorious or disappointing.' },
+  smite:        { name:'Divine Smite',    dmgType:'divine',   stat:'str', dice:[2,8], bonus:2, acc:0,  uses:10, desc:'Channel divine power through your blade. Moderate variance.' },
+  holyNova:     { name:'Holy Nova',       dmgType:'divine',   stat:'wis', dice:[1,18],bonus:2, acc:0,  uses:6,  desc:'Explosion of sacred energy. High variance burst.' },
+  moonfire:     { name:'Moonfire',        dmgType:'divine',   stat:'wis', dice:[3,5], bonus:2, acc:0,  uses:16, desc:'Burn with moonlight. Moderate consistency.' },
+  // CURSE — Drain/poison trade damage for utility. Pure damage follows same avg.
+  shadowBolt:   { name:'Shadow Bolt',     dmgType:'curse',    stat:'int', dice:[4,4], bonus:1, acc:1,  uses:20, desc:'Bolt of dark energy. Reliable curse damage.' },
+  lifeDrain:    { name:'Life Drain',      dmgType:'curse',    stat:'cha', dice:[2,6], bonus:2, acc:0,  uses:12, desc:'Siphon vitality. Lower damage but heals for half dealt.', drain:0.5 },
+  deathCoil:    { name:'Death Coil',      dmgType:'curse',    stat:'cha', dice:[1,20],bonus:1, acc:-1, uses:5,  desc:'Coil of death magic. Extreme variance.' },
+  hexBolt:      { name:'Hex Bolt',        dmgType:'curse',    stat:'cha', dice:[2,6], bonus:1, acc:0,  uses:15, desc:'Cursed projectile. Lower damage but may poison.', effect:'poison' },
+  poisonBlade:  { name:'Poisoned Blade',  dmgType:'curse',    stat:'dex', dice:[2,6], bonus:1, acc:1,  uses:15, desc:'Envenomed weapon. Lower damage but may poison.', effect:'poison' },
+  eldritchBlast:{ name:'Eldritch Blast',  dmgType:'curse',    stat:'cha', dice:[2,10],bonus:0, acc:0,  uses:10, desc:'Crackling dark energy. Same average, higher variance.' },
+  darkNova:     { name:'Dark Nova',       dmgType:'curse',    stat:'cha', dice:[1,22],bonus:0, acc:-1, uses:4,  desc:'Catastrophic dark energy. Maximum variance.' },
+  // HEALS — ~11 avg before stat mod.
+  layOnHands:   { name:'Lay on Hands',   dmgType:'heal', stat:'cha', dice:[3,5], bonus:2, acc:99, uses:4, desc:'Channel divine healing through touch.', heal:true },
+  cureWounds:   { name:'Cure Wounds',    dmgType:'heal', stat:'wis', dice:[3,5], bonus:2, acc:99, uses:5, desc:'Mend wounds with healing magic.', heal:true },
+  secondWind:   { name:'Second Wind',    dmgType:'heal', stat:'con', dice:[1,12],bonus:5, acc:99, uses:3, desc:'Rally through sheer willpower. Swingy heal.', heal:true },
+  herbalRemedy: { name:'Herbal Remedy',  dmgType:'heal', stat:'wis', dice:[2,6], bonus:4, acc:99, uses:4, desc:'Apply soothing healing herbs.', heal:true },
+  meditation:   { name:'Meditation',     dmgType:'heal', stat:'wis', dice:[2,8], bonus:2, acc:99, uses:4, desc:'Focus inner energy to heal.', heal:true },
+  darkPact:     { name:'Dark Pact',      dmgType:'heal', stat:'cha', dice:[2,6], bonus:4, acc:99, uses:4, desc:'Sacrifice dark energy to restore health.', heal:true },
+  rejuvenation: { name:'Rejuvenation',   dmgType:'heal', stat:'wis', dice:[4,3], bonus:3, acc:99, uses:5, desc:'Nature\'s restorative power. Very consistent.', heal:true },
+  manaShield:   { name:'Mana Shield',    dmgType:'heal', stat:'int', dice:[2,8], bonus:2, acc:99, uses:4, desc:'Convert magical energy into healing.', heal:true },
+};
+
+// ============================================================
+//  CLASSES (12 classes, grouped by primary type)
+// ============================================================
+const NAMES = {
+  knight:['Aldric','Seraphina','Theron','Isolde','Cedric','Elara','Baelin','Valor'],
+  mage:['Mordecai','Lyra','Thalindra','Orion','Vesper','Zephyra','Sylas','Arcana'],
+  elementalist:['Pyralis','Ember','Storm','Ignis','Solara','Vortex','Nova','Flux'],
+  paladin:['Galadriel','Ansel','Torin','Sera','Lumiel','Briar','Faith','Hallam'],
+  warlock:['Zarvox','Selene','Grimshaw','Noctis','Vashti','Hex','Faust','Bane'],
+  berserker:['Grukk','Brynhild','Ragnar','Uthgar','Korra','Wulfric','Throgg','Bjorn'],
+  cleric:['Maren','Devyn','Ansel','Sera','Hallam','Lumiel','Briar','Faith'],
+  necromancer:['Malachar','Lilith','Thanatos','Morgana','Dredge','Viessa','Umbra','Corvus'],
+  druid:['Oakhart','Willow','Bramble','Fern','Rowan','Moss','Thorn','Ashenbark'],
+  sorcerer:['Caspian','Nova','Pyralis','Vortex','Ember','Storm','Solara','Flux'],
+  assassin:['Shade','Nyx','Vex','Raven','Kael','Silka','Whisper','Dusk'],
+  monk:['Kai','Yuki','Zen','Lotus','Jin','Sora','Ryu','Bodhi'],
+};
+
+const CLASSES = [
+  { id:'knight', label:'Knight', color:'#c4a832',
+    stats:{str:16,dex:10,con:15,int:8,wis:12,cha:14}, ac:17,
+    abilities:['swordSlash','shieldBash','execute','layOnHands'],
+    resist:'physical', vuln:'magical', sprite:'knight' },
+  { id:'mage', label:'Mage', color:'#5577cc',
+    stats:{str:8,dex:14,con:10,int:18,wis:12,cha:10}, ac:12,
+    abilities:['arcaneBolt','arcaneBarrage','disintegrate','manaShield'],
+    resist:'magical', vuln:'elemental', sprite:'wizard' },
+  { id:'elementalist', label:'Elementalist', color:'#dd6633',
+    stats:{str:8,dex:12,con:11,int:17,wis:13,cha:12}, ac:12,
+    abilities:['fireBolt','lightning','meteor','manaShield'],
+    resist:'elemental', vuln:'divine', sprite:'sorcerer' },
+  { id:'paladin', label:'Paladin', color:'#ddaa33',
+    stats:{str:16,dex:10,con:14,int:8,wis:14,cha:15}, ac:18,
+    abilities:['smite','guidingBolt','judgment','layOnHands'],
+    resist:'divine', vuln:'curse', sprite:'knight' },
+  { id:'warlock', label:'Warlock', color:'#884488',
+    stats:{str:8,dex:14,con:12,int:12,wis:10,cha:18}, ac:13,
+    abilities:['hexBolt','eldritchBlast','darkNova','darkPact'],
+    resist:'curse', vuln:'physical', sprite:'warlock' },
+  { id:'berserker', label:'Berserker', color:'#aa4422',
+    stats:{str:18,dex:12,con:16,int:6,wis:8,cha:10}, ac:14,
+    abilities:['cleave','ragingBlow','execute','secondWind'],
+    resist:'physical', vuln:'magical', sprite:'barbarian' },
+  { id:'cleric', label:'Cleric', color:'#ccaa44',
+    stats:{str:14,dex:8,con:14,int:10,wis:18,cha:12}, ac:16,
+    abilities:['sacredFlame','holyNova','judgment','cureWounds'],
+    resist:'divine', vuln:'curse', sprite:'cleric' },
+  { id:'necromancer', label:'Necromancer', color:'#663366',
+    stats:{str:6,dex:12,con:10,int:16,wis:14,cha:14}, ac:11,
+    abilities:['shadowBolt','lifeDrain','deathCoil','darkPact'],
+    resist:'curse', vuln:'physical', sprite:'necro' },
+  { id:'druid', label:'Druid', color:'#558844',
+    stats:{str:10,dex:12,con:14,int:12,wis:17,cha:10}, ac:14,
+    abilities:['thornWhip','naturesWrath','earthquake','rejuvenation'],
+    resist:'elemental', vuln:'divine', sprite:'druid' },
+  { id:'sorcerer', label:'Sorcerer', color:'#cc5533',
+    stats:{str:8,dex:14,con:12,int:14,wis:10,cha:18}, ac:12,
+    abilities:['chaosBolt','arcaneBarrage','disintegrate','manaShield'],
+    resist:'magical', vuln:'elemental', sprite:'sorcerer' },
+  { id:'assassin', label:'Assassin', color:'#607070',
+    stats:{str:10,dex:18,con:12,int:14,wis:10,cha:12}, ac:15,
+    abilities:['quickStrike','backstab','poisonBlade','herbalRemedy'],
+    resist:'curse', vuln:'physical', sprite:'rogue' },
+  { id:'monk', label:'Monk', color:'#aa8844',
+    stats:{str:10,dex:17,con:12,int:10,wis:16,cha:8}, ac:16,
+    abilities:['flurry','kiBlast','execute','meditation'],
+    resist:'magical', vuln:'curse', sprite:'monk' },
+];
+
+// ============================================================
+//  SPRITES
+// ============================================================
+const SPRITES = {
+  knight:    ['...xxxx...','..xxxxxx..','..xxxxxx..','...xxxx...','..xxxxxx..','.xxxxxxxx.','.xxxxxxxx.','..xxxxxx..','..xx..xx..','..xx..xx..'],
+  wizard:    ['....xx....','...xxxx...','..xxxxxx..','...xxxx...','...xxxx...','..xxxxxx..','..xxxxxx..','..xxxxxx..','...x..x...','...x..x...'],
+  rogue:     ['...xxx....','..xxxxx...','..xxxxx...','...xxx....','..xxxxx...','..xxxxx...','..xxxxx...','...xxx....','..xx.xx...','..x...x...'],
+  barbarian: ['..xxxxx...','..xxxxx...','..xxxxx...','...xxx....','.xxxxxxx..','xxxxxxxxx.','.xxxxxxx..','..xxxxx...','..xx.xx..','.xxx.xxx..'],
+  necro:     ['...xxxx...','..xxxxxx..','..xxxxxx..','...xxxx...','..xxxxxx..','.xxxxxxxx.','..xxxxxx..','...xxxx...','...xx.x...','...x..x...'],
+  cleric:    ['....xx....','...xxxx...','...xxxx...','...xxxx...','..xxxxxx..','.xxxxxxxx.','..xxxxxx..','..xxxxxx..','..xx..xx..','..xx..xx..'],
+  warlock:   ['..x.xx.x..','..xxxxxx..','..xxxxxx..','...xxxx...','..xxxxxx..','.xxxxxxxx.','..xxxxxx..','..xxxxxx..','...x..x...','...x..x...'],
+  druid:     ['.xxx.xxx..','..xxxxxx..','..xxxxxx..','...xxxx...','..xxxxxx..','..xxxxxx..','..xxxxxx..','...xxxx...','..xx..xx..','..x....x..'],
+  sorcerer:  ['...xxxx...','..xxxxxx..','..xxxxxx..','...xxxx...','..xxxxxx..','.xxxxxxxx.','..xxxxxx..','..xxxxxx..','...x..x...','...x..x...'],
+  monk:      ['....xx....','...xxxx...','...xxxx...','...xxxx...','..xxxxxx..','..xxxxxx..','..xxxxxx..','...xxxx...','..xx..xx..','..x....x..'],
+};
+SPRITES.fighter = SPRITES.knight;
+
+function drawSprite(canvas, spriteKey, color, flipped) {
+  const ctx = canvas.getContext('2d'); const w = canvas.width, h = canvas.height;
+  ctx.clearRect(0, 0, w, h);
+  const shape = SPRITES[spriteKey] || SPRITES.knight;
+  const gridH = shape.length, gridW = shape[0].length;
+  const cellW = w / gridW, cellH = h / gridH;
+  const dark = shadeColor(color, -40), light = shadeColor(color, 35);
+  const seed = hashStr(spriteKey + color); const rng = mulberry32(seed);
+  for (let y = 0; y < gridH; y++) {
+    for (let x = 0; x < gridW; x++) {
+      if (shape[y][x] !== 'x') continue;
+      let c = color;
+      if (y === 0 || shape[y-1]?.[x] !== 'x') c = dark;
+      else if (x === 0 || shape[y][x-1] !== 'x') c = dark;
+      else if (rng() > 0.7) c = light;
+      if ((y === 2) && (x === 3 || x === 5)) c = '#fff';
+      if ((y === 2) && (x === 4 || x === 6)) c = '#111';
+      const drawX = flipped ? w - (x + 1) * cellW : x * cellW;
+      ctx.fillStyle = c;
+      ctx.fillRect(Math.floor(drawX), Math.floor(y * cellH), Math.ceil(cellW), Math.ceil(cellH));
+    }
+  }
+}
+
+// ============================================================
+//  COMBAT ENGINE
+// ============================================================
+function calcHP(con, level) { return 10 + mod(con) + (level - 1) * Math.max(1, 6 + mod(con)); }
+
+function createCombatant(cls, level) {
+  const name = pick(NAMES[cls.id] || NAMES.knight);
+  const hp = calcHP(cls.stats.con, level);
+  return {
+    cls, name, level, ac: cls.ac,
+    stats: {...cls.stats},
+    currentHp: hp, maxHp: hp,
+    abilities: cls.abilities.map(k => ({...ABILITIES[k], key:k, currentUses: ABILITIES[k].uses})),
+    status: null, statusTurns: 0, fainted: false,
+  };
+}
+
+function attackRoll(attacker, ability, defenderAC) {
+  if (ability.acc === 99) return { hit: true, nat: 10, total: 99, crit: false };
+  const statMod = mod(attacker.stats[ability.stat]);
+  const prof = Math.floor(attacker.level / 4) + 2;
+  const nat = d(20);
+  const total = nat + statMod + prof + (ability.acc || 0);
+  const crit = nat === 20;
+  return { hit: nat === 20 || total >= defenderAC, nat, total, crit };
+}
+
+function rollDamageForAbility(attacker, ability, crit) {
+  const [count, sides] = ability.dice;
+  const dc = crit ? count * 2 : count;
+  return Math.max(1, rollDice(dc, sides) + ability.bonus + mod(attacker.stats[ability.stat]));
+}
+
+function getInitiative(c) { return d(20) + mod(c.stats.dex); }
+
+// ============================================================
+//  GAME STATE
+// ============================================================
+let playerTeam = [], oppTeam = [];
+let playerActive = 0, oppActive = 0;
+let battleNum = 0, wins = 0, losses = 0;
+let isAnimating = false, autoMode = false, autoTimer = null;
+
+const logEl = document.getElementById('battle-log');
+const moveButtonsEl = document.getElementById('move-buttons');
+const tooltipEl = document.getElementById('tooltip');
+
+function player() { return playerTeam[playerActive]; }
+function opponent() { return oppTeam[oppActive]; }
+
+function log(text, cls='') {
+  const div = document.createElement('div');
+  div.className = 'log-line ' + cls;
+  div.textContent = text;
+  logEl.appendChild(div);
+  logEl.scrollTop = logEl.scrollHeight;
+}
+
+// ============================================================
+//  UI RENDERING
+// ============================================================
+function updateHpBar(who) {
+  const b = who === 'player' ? player() : opponent();
+  const bar = document.getElementById(who === 'player' ? 'player-hp-bar' : 'opp-hp-bar');
+  const text = document.getElementById(who === 'player' ? 'player-hp-text' : 'opp-hp-text');
+  const pct = Math.max(0, b.currentHp / b.maxHp * 100);
+  bar.style.width = pct + '%';
+  bar.className = 'hp-bar' + (pct < 25 ? ' red' : pct < 50 ? ' yellow' : '');
+  let hp = Math.max(0, b.currentHp) + ' / ' + b.maxHp;
+  if (b.status) hp += ` <span class="status-badge ${b.status}">${b.status.toUpperCase()}</span>`;
+  text.innerHTML = hp;
+}
+
+function renderActiveInfo(who) {
+  const b = who === 'player' ? player() : opponent();
+  const prefix = who === 'player' ? 'player' : 'opp';
+  document.getElementById(prefix + '-name').textContent = b.name;
+  document.getElementById(prefix + '-class').textContent = b.cls.label;
+  document.getElementById(prefix + '-level').textContent = 'Lv' + b.level + ' AC:' + b.ac;
+  const s = b.stats;
+  document.getElementById(prefix + '-stats').innerHTML =
+    `<span>STR ${s.str}</span><span>DEX ${s.dex}</span><span>CON ${s.con}</span><span>INT ${s.int}</span><span>WIS ${s.wis}</span><span>CHA ${s.cha}</span>`;
+  document.getElementById(prefix + '-types').innerHTML =
+    `<span class="resist-tag">Resist: ${b.cls.resist}</span> | <span class="vuln-tag">Vuln: ${b.cls.vuln}</span>`;
+  updateHpBar(who);
+}
+
+function renderSprite(who) {
+  const b = who === 'player' ? player() : opponent();
+  const canvas = document.getElementById(who === 'player' ? 'player-sprite' : 'opp-sprite');
+  canvas.classList.remove('fainted','hit','attacking','entering');
+  drawSprite(canvas, b.cls.sprite, b.cls.color, who === 'player');
+  canvas.classList.add('entering');
+  setTimeout(() => canvas.classList.remove('entering'), 400);
+}
+
+function renderRoster(who) {
+  const team = who === 'player' ? playerTeam : oppTeam;
+  const activeIdx = who === 'player' ? playerActive : oppActive;
+  const el = document.getElementById(who === 'player' ? 'player-roster' : 'opp-roster');
+  el.innerHTML = '';
+  team.forEach((b, i) => {
+    const entry = document.createElement('div');
+    entry.className = 'roster-entry' + (i === activeIdx ? ' active' : '') + (b.fainted ? ' fainted' : '');
+    if (who === 'player' && !b.fainted && i !== activeIdx && !isAnimating) entry.classList.add('switchable');
+    const pct = Math.max(0, b.currentHp / b.maxHp * 100);
+    const barCls = pct < 25 ? 'red' : pct < 50 ? 'yellow' : '';
+    entry.innerHTML = `<div class="roster-name" style="color:${b.cls.color}">${b.name}</div>
+      <div class="roster-class">${b.cls.label} ${b.fainted ? '(KO)' : Math.max(0,b.currentHp)+'/'+b.maxHp}</div>
+      <div class="roster-hp-bar"><div class="roster-hp-fill ${barCls}" style="width:${pct}%"></div></div>`;
+    if (who === 'player' && !b.fainted && i !== activeIdx) {
+      entry.onclick = () => { if (!isAnimating && !b.fainted) doSwitch(i); };
+    }
+    el.appendChild(entry);
+  });
+}
+
+// ============================================================
+//  TOOLTIP
+// ============================================================
+function calcMoveStats(ability, attacker) {
+  const statMod = mod(attacker.stats[ability.stat]);
+  const [count, sides] = ability.dice;
+  const totalBonus = ability.bonus + statMod;
+  const minDmg = count + totalBonus;
+  const maxDmg = count * sides + totalBonus;
+  const avgDmg = count * (sides + 1) / 2 + totalBonus;
+  const variance = count * (sides * sides - 1) / 12;
+  const stdDev = Math.sqrt(variance);
+  const cv = avgDmg > 0 ? stdDev / avgDmg : 0;
+  let varLabel, varClass;
+  if (cv < 0.22) { varLabel = 'Low (Consistent)'; varClass = 'low'; }
+  else if (cv < 0.35) { varLabel = 'Medium (Moderate)'; varClass = 'med'; }
+  else if (cv < 0.48) { varLabel = 'High (Volatile)'; varClass = 'high'; }
+  else { varLabel = 'Extreme (Chaotic)'; varClass = 'extreme'; }
+  return { minDmg: Math.max(1, minDmg), maxDmg, avgDmg: avgDmg.toFixed(1), varLabel, varClass, totalBonus, stdDev };
+}
+
+function showTooltip(btn, ability) {
+  const p = player();
+  const o = opponent();
+  const s = calcMoveStats(ability, p);
+  const diceStr = `${ability.dice[0]}d${ability.dice[1]}${s.totalBonus > 0 ? '+' + s.totalBonus : s.totalBonus < 0 ? s.totalBonus : ''}`;
+  const typeLabel = TYPE_LABELS[ability.dmgType] || ability.dmgType;
+  const typeIcon = TYPE_ICONS[ability.dmgType] || '';
+
+  let effHtml = '';
+  if (!ability.heal && o) {
+    const eff = getEffectiveness(ability.dmgType, o.cls.resist, o.cls.vuln);
+    if (eff > 1) effHtml = `<div class="tt-effectiveness super">${typeIcon} Super Effective vs ${o.name}! (${eff}x)</div>`;
+    else if (eff < 1) effHtml = `<div class="tt-effectiveness resisted">${typeIcon} Resisted by ${o.name} (${eff}x)</div>`;
+  }
+
+  let rangeHtml = '';
+  if (!ability.heal) {
+    const rangePct = s.maxDmg > 0 ? ((s.avgDmg - s.minDmg) / (s.maxDmg - s.minDmg || 1)) * 100 : 50;
+    rangeHtml = `<div class="tt-range-bar"><div class="tt-range-fill" style="width:100%"></div><div class="tt-range-avg" style="left:${rangePct}%"></div></div>
+      <div class="tt-range-labels"><span>${s.minDmg} min</span><span>${s.avgDmg} avg</span><span>${s.maxDmg} max</span></div>`;
+  }
+
+  const drainNote = ability.drain ? `<div class="tt-stat"><span class="tt-stat-label">Special</span><span class="tt-stat-val">Heals ${ability.drain*100}% of damage</span></div>` : '';
+  const effectNote = ability.effect ? `<div class="tt-stat"><span class="tt-stat-label">Effect</span><span class="tt-stat-val">May inflict ${ability.effect}</span></div>` : '';
+
+  tooltipEl.innerHTML = `
+    <div class="tt-name">${ability.name}</div>
+    <span class="tt-type ${ability.dmgType}">${typeIcon} ${typeLabel}</span>
+    <div class="tt-stats">
+      <div class="tt-stat"><span class="tt-stat-label">Dice</span><span class="tt-stat-val">${diceStr}</span></div>
+      <div class="tt-stat"><span class="tt-stat-label">Accuracy</span><span class="tt-stat-val">${ability.acc === 99 ? 'Auto-hit' : (ability.acc >= 0 ? '+' : '') + ability.acc}</span></div>
+      <div class="tt-stat"><span class="tt-stat-label">Uses</span><span class="tt-stat-val">${ability.currentUses} / ${ability.uses}</span></div>
+      ${drainNote}${effectNote}
+    </div>
+    ${ability.heal ? '' : `<div class="tt-variance ${s.varClass}">Variance: ${s.varLabel}</div>`}
+    ${rangeHtml}
+    ${effHtml}
+    <div class="tt-desc">${ability.desc}</div>`;
+
+  tooltipEl.style.display = 'block';
+  const rect = btn.getBoundingClientRect();
+  let top = rect.top - tooltipEl.offsetHeight - 8;
+  if (top < 5) top = rect.bottom + 8;
+  let left = rect.left + rect.width / 2 - 130;
+  left = Math.max(5, Math.min(left, window.innerWidth - 270));
+  tooltipEl.style.top = top + 'px';
+  tooltipEl.style.left = left + 'px';
+}
+
+function hideTooltip() { tooltipEl.style.display = 'none'; }
+
+// ============================================================
+//  MOVE BUTTONS
+// ============================================================
+function renderMoves() {
+  moveButtonsEl.innerHTML = '';
+  const p = player();
+  if (!p || p.fainted) return;
+  p.abilities.forEach((ab, i) => {
+    const btn = document.createElement('button');
+    btn.className = 'move-btn';
+    btn.dataset.dmg = ab.dmgType;
+    const s = calcMoveStats(ab, p);
+    const diceStr = `${ab.dice[0]}d${ab.dice[1]}${s.totalBonus>0?'+'+s.totalBonus:s.totalBonus<0?s.totalBonus:''}`;
+    const tag = ab.heal ? 'HEAL' : ab.dmgType.toUpperCase();
+    let effHint = '';
+    if (!ab.heal && opponent()) {
+      const eff = getEffectiveness(ab.dmgType, opponent().cls.resist, opponent().cls.vuln);
+      if (eff > 1) effHint = ' [SUPER!]';
+      else if (eff < 1) effHint = ' [RESIST]';
+    }
+    btn.innerHTML = `<span class="move-name">${ab.name}${effHint}</span><span class="move-info">${tag} | ${diceStr} | ${ab.currentUses}/${ab.uses}</span>`;
+    btn.disabled = ab.currentUses <= 0 || isAnimating;
+    btn.onclick = () => executeTurn(i);
+    btn.onmouseenter = () => showTooltip(btn, ab);
+    btn.onmouseleave = hideTooltip;
+    moveButtonsEl.appendChild(btn);
+  });
+}
+
+// ============================================================
+//  BATTLE FLOW
+// ============================================================
+function startBattle() {
+  battleNum++;
+  document.getElementById('battle-num').textContent = battleNum;
+
+  const level = Math.min(20, 5 + Math.floor(battleNum / 3));
+  const shuffled = shuffle(CLASSES);
+  playerTeam = shuffled.slice(0, 4).map(c => createCombatant(c, level));
+  oppTeam = shuffled.slice(4, 8).map(c => createCombatant(c, level));
+  playerActive = 0; oppActive = 0;
+
+  renderActiveInfo('player'); renderActiveInfo('opponent');
+  renderSprite('player'); renderSprite('opponent');
+  renderRoster('player'); renderRoster('opponent');
+  renderMoves();
+
+  log(`--- Encounter #${battleNum} ---`, 'divider');
+  log(`Your team: ${playerTeam.map(b => b.name + ' the ' + b.cls.label).join(', ')}`, 'info');
+  log(`Enemy team: ${oppTeam.map(b => b.name + ' the ' + b.cls.label).join(', ')}`, 'info');
+  log(`${player().name} the ${player().cls.label} steps into the arena.`, 'info');
+  log(`${opponent().name} the ${opponent().cls.label} stands ready!`, 'info');
+}
+
+async function doSwitch(newIdx) {
+  if (isAnimating || playerTeam[newIdx].fainted) return;
+  isAnimating = true;
+  const old = player().name;
+  playerActive = newIdx;
+  log(`${old} withdraws! ${player().name} the ${player().cls.label} enters the battle!`, 'switch');
+  renderActiveInfo('player'); renderSprite('player'); renderRoster('player'); renderMoves();
+
+  // Opponent gets a free attack
+  await delay(400);
+  const oppAbIdx = pickAIAbility();
+  const oppAb = opponent().abilities[oppAbIdx]?.currentUses > 0 ? opponent().abilities[oppAbIdx] : STRUGGLE;
+  await executeAbility(opponent(), player(), oppAb);
+
+  if (player().fainted) { await handleFaint('player'); }
+  if (!opponent().fainted) await tickStatus(opponent());
+  if (!player().fainted) await tickStatus(player());
+
+  isAnimating = false;
+  renderMoves(); renderRoster('player'); renderRoster('opponent');
+  if (checkWin()) return;
+  if (autoMode) scheduleAutoTurn();
+}
+
+const STRUGGLE = { name:'Desperate Strike', dmgType:'physical', stat:'str', dice:[1,4], bonus:0, acc:0, uses:999, currentUses:999, desc:'A feeble last resort' };
+
+async function executeTurn(moveIdx) {
+  if (isAnimating) return;
+  isAnimating = true;
+  hideTooltip();
+
+  const p = player(), o = opponent();
+  const playerAb = p.abilities[moveIdx]?.currentUses > 0 ? p.abilities[moveIdx] : STRUGGLE;
+  const oppAbIdx = pickAIAbility();
+  const oppAb = o.abilities[oppAbIdx]?.currentUses > 0 ? o.abilities[oppAbIdx] : STRUGGLE;
+
+  const pInit = getInitiative(p), oInit = getInitiative(o);
+  let first, second, firstAb, secondAb;
+  if (pInit >= oInit) { first = p; second = o; firstAb = playerAb; secondAb = oppAb; }
+  else { first = o; second = p; firstAb = oppAb; secondAb = playerAb; }
+  log(`Initiative: ${p.name} ${pInit} vs ${o.name} ${oInit}`, 'roll');
+
+  await executeAbility(first, second, firstAb);
+  if (second.fainted) await handleFaint(second === p ? 'player' : 'opponent');
+  if (first.fainted) await handleFaint(first === p ? 'player' : 'opponent');
+
+  if (checkWin()) { isAnimating = false; return; }
+
+  if (!second.fainted && !first.fainted) {
+    await delay(300);
+    await executeAbility(second, first, secondAb);
+    if (first.fainted) await handleFaint(first === p ? 'player' : 'opponent');
+    if (second.fainted) await handleFaint(second === p ? 'player' : 'opponent');
+  }
+
+  if (checkWin()) { isAnimating = false; return; }
+
+  if (!player().fainted) await tickStatus(player());
+  if (!opponent().fainted) await tickStatus(opponent());
+  if (player().fainted) await handleFaint('player');
+  if (opponent().fainted) await handleFaint('opponent');
+
+  if (checkWin()) { isAnimating = false; return; }
+
+  isAnimating = false;
+  renderMoves(); renderRoster('player'); renderRoster('opponent');
+  if (autoMode) scheduleAutoTurn();
+}
+
+async function executeAbility(attacker, defender, ability) {
+  const atkName = attacker.name, defName = defender.name;
+  const isPlayer = playerTeam.includes(attacker);
+
+  if (attacker.status === 'stun') {
+    attacker.statusTurns--;
+    if (attacker.statusTurns <= 0) { attacker.status = null; log(`${atkName} shakes off the stun!`, 'status'); }
+    else { log(`${atkName} is stunned!`, 'status'); return; }
+  }
+  if (attacker.status === 'slow' && Math.random() < 0.33) {
+    log(`${atkName} is slowed and fumbles!`, 'status'); return;
+  }
+
+  ability.currentUses = Math.max(0, ability.currentUses - 1);
+
+  if (ability.heal) {
+    const heal = rollDamageForAbility(attacker, ability, false);
+    attacker.currentHp = Math.min(attacker.maxHp, attacker.currentHp + heal);
+    updateHpBar(isPlayer ? 'player' : 'opponent');
+    showDmgFloat(isPlayer ? 'player' : 'opponent', heal, false, true);
+    log(`${atkName} uses ${ability.name} and heals ${heal} HP!`, 'heal');
+    renderRoster(isPlayer ? 'player' : 'opponent');
+    return;
+  }
+
+  log(`${atkName} uses ${ability.name}!`);
+  const roll = attackRoll(attacker, ability, defender.ac);
+  const atkSprite = document.getElementById(isPlayer ? 'player-sprite' : 'opp-sprite');
+  const defSprite = document.getElementById(isPlayer ? 'opp-sprite' : 'player-sprite');
+
+  atkSprite.classList.add('attacking'); await delay(150); atkSprite.classList.remove('attacking');
+
+  if (!roll.hit) {
+    log(`  Roll: ${roll.nat} + mods = ${roll.total} vs AC ${defender.ac} - Miss!`, 'miss');
+    return;
+  }
+
+  defSprite.classList.add('hit'); await delay(300); defSprite.classList.remove('hit');
+
+  let dmg = rollDamageForAbility(attacker, ability, roll.crit);
+  const mult = getEffectiveness(ability.dmgType, defender.cls.resist, defender.cls.vuln);
+  dmg = Math.max(1, Math.floor(dmg * mult));
+
+  const rollStr = roll.nat === 20 ? 'NAT 20!' : `${roll.nat} + mods = ${roll.total}`;
+  log(`  Roll: ${rollStr} vs AC ${defender.ac} - Hit!`, 'roll');
+  if (roll.crit) log(`  CRITICAL HIT!`, 'crit');
+  if (mult > 1) log(`  Super effective vs ${defName}!`, 'vuln');
+  if (mult < 1) log(`  ${defName} resists ${ability.dmgType}.`, 'resist');
+
+  defender.currentHp = Math.max(0, defender.currentHp - dmg);
+  updateHpBar(!isPlayer ? 'player' : 'opponent');
+  showDmgFloat(!isPlayer ? 'player' : 'opponent', dmg, roll.crit, false);
+  log(`  ${defName} takes ${dmg} ${ability.dmgType} damage!`, 'damage');
+  renderRoster(!isPlayer ? 'player' : 'opponent');
+
+  if (ability.drain) {
+    const healAmt = Math.floor(dmg * ability.drain);
+    attacker.currentHp = Math.min(attacker.maxHp, attacker.currentHp + healAmt);
+    updateHpBar(isPlayer ? 'player' : 'opponent');
+    log(`  ${atkName} drains ${healAmt} HP!`, 'heal');
+    renderRoster(isPlayer ? 'player' : 'opponent');
+  }
+
+  if (ability.effect && !defender.status) {
+    const saveDC = 8 + mod(attacker.stats[ability.stat]) + Math.floor(attacker.level/4) + 2;
+    const save = d(20) + mod(defender.stats.wis);
+    if (save < saveDC) {
+      const turns = ability.effect === 'stun' ? 2 : 3;
+      defender.status = ability.effect; defender.statusTurns = turns;
+      log(`  ${defName} is ${ability.effect}ed! (DC ${saveDC}, saved ${save})`, 'status');
+    } else {
+      log(`  ${defName} saves vs ${ability.effect}! (DC ${saveDC}, rolled ${save})`, 'roll');
+    }
+    updateHpBar(!isPlayer ? 'player' : 'opponent');
+  }
+
+  if (defender.currentHp <= 0) { defender.fainted = true; animateFaint(defender); }
+}
+
+async function tickStatus(battler) {
+  if (!battler.status) return;
+  const isPlayer = playerTeam.includes(battler);
+  if (battler.status === 'poison') {
+    const dmg = Math.max(1, Math.floor(battler.maxHp / 10));
+    battler.currentHp = Math.max(0, battler.currentHp - dmg);
+    updateHpBar(isPlayer ? 'player' : 'opponent');
+    battler.statusTurns--;
+    log(`${battler.name} takes ${dmg} poison damage!`, 'status');
+    renderRoster(isPlayer ? 'player' : 'opponent');
+    if (battler.statusTurns <= 0) { battler.status = null; log(`${battler.name}'s poison wears off.`, 'status'); }
+    if (battler.currentHp <= 0) { battler.fainted = true; animateFaint(battler); }
+  }
+  if (battler.status === 'slow') {
+    battler.statusTurns--;
+    if (battler.statusTurns <= 0) { battler.status = null; log(`${battler.name} is no longer slowed.`, 'status'); }
+  }
+}
+
+function animateFaint(b) {
+  const isPlayer = playerTeam.includes(b);
+  document.getElementById(isPlayer ? 'player-sprite' : 'opp-sprite').classList.add('fainted');
+}
+
+async function handleFaint(who) {
+  const team = who === 'player' ? playerTeam : oppTeam;
+  const active = who === 'player' ? playerActive : oppActive;
+  const b = team[active];
+  if (!b.fainted) return;
+
+  const deathLines = ['collapses!','crumples in defeat!','falls lifeless!','is vanquished!'];
+  log(`${b.name} ${pick(deathLines)}`, 'faint');
+  renderRoster(who);
+
+  await delay(600);
+
+  const nextIdx = team.findIndex((t, i) => i !== active && !t.fainted);
+  if (nextIdx >= 0) {
+    if (who === 'player') playerActive = nextIdx;
+    else oppActive = nextIdx;
+    const next = who === 'player' ? player() : opponent();
+    log(`${next.name} the ${next.cls.label} enters the fight!`, 'switch');
+    renderActiveInfo(who); renderSprite(who); renderRoster(who);
+    await delay(400);
+  }
+}
+
+function checkWin() {
+  const pAlive = playerTeam.some(b => !b.fainted);
+  const oAlive = oppTeam.some(b => !b.fainted);
+  if (!pAlive) {
+    losses++; document.getElementById('p-losses').textContent = losses;
+    log('All your warriors have fallen. Defeat!', 'faint');
+    setTimeout(() => { startBattle(); if (autoMode) scheduleAutoTurn(); }, autoMode ? 1200 : 2000);
+    return true;
+  }
+  if (!oAlive) {
+    wins++; document.getElementById('p-wins').textContent = wins;
+    log('All enemies defeated. Victory!', 'win');
+    setTimeout(() => { startBattle(); if (autoMode) scheduleAutoTurn(); }, autoMode ? 1200 : 2000);
+    return true;
+  }
+  return false;
+}
+
+function showDmgFloat(who, amount, isCrit, isHeal) {
+  const area = who === 'player' ? document.querySelector('.player-area') : document.querySelector('.opponent-area');
+  const el = document.createElement('div');
+  el.className = 'dmg-float' + (isCrit ? ' crit' : '') + (isHeal ? ' heal' : '');
+  el.style.color = isHeal ? '#6aaa5a' : '#cc6644';
+  el.textContent = (isHeal ? '+' : '-') + amount;
+  el.style.left = (30 + Math.random() * 40) + 'px';
+  el.style.top = '20px';
+  area.appendChild(el);
+  setTimeout(() => el.remove(), 1000);
+}
+
+// ============================================================
+//  AI
+// ============================================================
+function pickAIAbility() {
+  const o = opponent();
+  if (o.currentHp < o.maxHp * 0.3) {
+    const healIdx = o.abilities.findIndex(a => a.heal && a.currentUses > 0);
+    if (healIdx >= 0) return healIdx;
+  }
+  let best = -1, bestScore = -Infinity;
+  o.abilities.forEach((ab, i) => {
+    if (ab.currentUses <= 0 || ab.heal) return;
+    const statMod = mod(o.stats[ab.stat]);
+    const avgDmg = ab.dice[0] * (ab.dice[1] + 1) / 2 + ab.bonus + statMod;
+    const mult = getEffectiveness(ab.dmgType, player().cls.resist, player().cls.vuln);
+    const score = avgDmg * mult * (0.8 + Math.random() * 0.4);
+    if (score > bestScore) { bestScore = score; best = i; }
+  });
+  if (best === -1) best = o.abilities.findIndex(a => a.currentUses > 0) || 0;
+  return best;
+}
+
+function pickSmartMove() {
+  const p = player();
+  if (p.currentHp < p.maxHp * 0.3) {
+    const healIdx = p.abilities.findIndex(a => a.heal && a.currentUses > 0);
+    if (healIdx >= 0) return healIdx;
+  }
+  let best = -1, bestScore = -Infinity;
+  p.abilities.forEach((ab, i) => {
+    if (ab.currentUses <= 0 || ab.heal) return;
+    const statMod = mod(p.stats[ab.stat]);
+    const avgDmg = ab.dice[0] * (ab.dice[1] + 1) / 2 + ab.bonus + statMod;
+    const mult = getEffectiveness(ab.dmgType, opponent().cls.resist, opponent().cls.vuln);
+    const score = avgDmg * mult * (0.85 + Math.random() * 0.3);
+    if (score > bestScore) { bestScore = score; best = i; }
+  });
+  if (best === -1) best = p.abilities.findIndex(a => a.currentUses > 0) || 0;
+  return best;
+}
+
+// ============================================================
+//  AUTO BATTLE
+// ============================================================
+let autoSpeed = 500;
+const btnAuto = document.getElementById('btn-auto');
+btnAuto.onclick = () => {
+  autoMode = !autoMode;
+  btnAuto.classList.toggle('active', autoMode);
+  btnAuto.textContent = autoMode ? 'Stop Auto' : 'Auto Battle';
+  if (autoMode && !isAnimating) scheduleAutoTurn();
+  if (!autoMode && autoTimer) { clearTimeout(autoTimer); autoTimer = null; }
+};
+const speedSlider = document.getElementById('speed-slider');
+const speedLabel = document.getElementById('speed-label');
+speedSlider.oninput = () => { autoSpeed = parseInt(speedSlider.value); speedLabel.textContent = autoSpeed + 'ms'; };
+
+function scheduleAutoTurn() {
+  if (!autoMode) return;
+  autoTimer = setTimeout(() => {
+    if (!autoMode || isAnimating) return;
+    executeTurn(pickSmartMove());
+  }, autoSpeed);
+}
+
+// ============================================================
+//  INIT
+// ============================================================
+startBattle();
+</script>
+</body>
+</html>
