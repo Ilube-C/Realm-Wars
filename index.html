@@ -127,6 +127,29 @@ body {
 .status-badge.poison { background: #2a4a1a; color: #6a4; }
 .status-badge.stun { background: #4a4a1a; color: #aa8; }
 .status-badge.slow { background: #1a2a4a; color: #68a; }
+.status-badge.frozen { background: #1a3a5a; color: #8ad; }
+
+/* Stance Modal */
+#stance-modal {
+  display: none; position: absolute; inset: 0; z-index: 100;
+  background: rgba(0,0,0,0.7); justify-content: center; align-items: center;
+}
+#stance-modal.show { display: flex; }
+#stance-modal .stance-box {
+  background: linear-gradient(135deg, #1a1510, #2a2018); border: 2px solid #5a4a2a;
+  border-radius: 8px; padding: 16px; max-width: 400px; text-align: center;
+}
+#stance-modal .stance-box h3 { color: #e8d8b0; margin-bottom: 10px; font-size: 15px; }
+#stance-modal .stance-btn {
+  display: block; width: 100%; margin: 6px 0; padding: 10px;
+  background: #2a2518; border: 2px solid #4a3a20; border-radius: 6px;
+  color: #d4c5a0; font-size: 12px; cursor: pointer; text-align: left;
+  transition: border-color 0.15s;
+}
+#stance-modal .stance-btn:hover { border-color: #aa8a4a; background: #3a3020; }
+#stance-modal .stance-btn .stance-name { font-weight: 700; font-size: 13px; color: #e8d8b0; }
+#stance-modal .stance-btn .stance-desc { font-size: 10px; color: #9a8a6a; margin-top: 3px; }
+.stance-indicator { font-size: 9px; color: #8ab; margin-left: 6px; font-style: italic; }
 
 /* Bottom Panel */
 #bottom-panel { height: 240px; display: flex; background: #12100c; border-top: 2px solid #3a2a1a; }
@@ -278,6 +301,7 @@ body {
   </div>
 </div>
 <div id="tooltip"></div>
+<div id="stance-modal"><div class="stance-box" id="stance-box"></div></div>
 
 <script>
 // ============================================================
@@ -362,6 +386,11 @@ const ABILITIES = {
   darkPact:     { name:'Dark Pact',      dmgType:'heal', stat:'cha', dice:[2,6], bonus:4, acc:99, uses:4, desc:'Sacrifice dark energy to restore health.', heal:true },
   rejuvenation: { name:'Rejuvenation',   dmgType:'heal', stat:'wis', dice:[4,3], bonus:3, acc:99, uses:5, desc:'Nature\'s restorative power. Very consistent.', heal:true },
   manaShield:   { name:'Mana Shield',    dmgType:'heal', stat:'int', dice:[2,8], bonus:2, acc:99, uses:4, desc:'Convert magical energy into healing.', heal:true },
+  // LICH ABILITIES
+  lichBlast:    { name:'Lich Blast',      dmgType:'magical',  stat:'int', dice:[3,6], bonus:2, acc:0,  uses:14, desc:'Concentrated necrotic-arcane blast. High damage with a chance to freeze.', freezeChance:0.2 },
+  glaciate:     { name:'Glaciate',        dmgType:'magical',  stat:'int', dice:[2,4], bonus:1, acc:1,  uses:16, desc:'Wave of absolute cold. Low damage but very high freeze chance.', freezeChance:0.6 },
+  lichLifeDrain:{ name:'Life Drain',      dmgType:'magical',  stat:'int', dice:[2,8], bonus:1, acc:0,  uses:10, desc:'Siphon life force from the target. Heals proportion of damage dealt.', drain:0.5 },
+  shatter:      { name:'Shatter',         dmgType:'physical', stat:'int', dice:[4,8], bonus:4, acc:1,  uses:6,  desc:'Shatter a frozen target into pieces. ONLY works on frozen enemies.', requiresFrozen:true },
 };
 
 // ============================================================
@@ -380,6 +409,7 @@ const NAMES = {
   sorcerer:['Caspian','Nova','Pyralis','Vortex','Ember','Storm','Solara','Flux'],
   assassin:['Shade','Nyx','Vex','Raven','Kael','Silka','Whisper','Dusk'],
   monk:['Kai','Yuki','Zen','Lotus','Jin','Sora','Ryu','Bodhi'],
+  lich:['Malachar','Xyranthos','Vek\'thar','Osseus','Dreadhollow','Lichtar','Nekros','Morvaine'],
 };
 
 const CLASSES = [
@@ -431,7 +461,70 @@ const CLASSES = [
     stats:{str:10,dex:17,con:12,int:10,wis:16,cha:8}, ac:16,
     abilities:['flurry','kiBlast','execute','meditation'],
     resist:'magical', vuln:'curse', sprite:'monk' },
+  { id:'lich', label:'Lich', color:'#44ccdd',
+    stats:{str:6,dex:10,con:12,int:19,wis:14,cha:14}, ac:13,
+    abilities:['lichBlast','glaciate','lichLifeDrain','shatter'],
+    resist:'magical', vuln:'divine', sprite:'lich',
+    stances: [
+      { id:'arcticAura', name:'Arctic Aura', desc:'CON+2, CHA+2. Adds 10% freeze chance to ALL moves.',
+        statBoosts:{con:2,cha:2}, passive:'freezeAll' },
+      { id:'soulSnatcher', name:'Soul Snatcher', desc:'INT+3. Heals 20% max HP on killing an enemy.',
+        statBoosts:{int:3}, passive:'killHeal' },
+    ]},
 ];
+
+// Generate default stances for classes that don't have them
+const DEFAULT_STANCES = {
+  knight: [
+    { id:'ironGuard', name:'Iron Guard', desc:'CON+2. Defensive and sturdy.', statBoosts:{con:2}, passive:'none' },
+    { id:'aggressor', name:'Aggressor', desc:'STR+2, DEX+1. Offense-focused.', statBoosts:{str:2,dex:1}, passive:'none' },
+  ],
+  mage: [
+    { id:'arcaneFlow', name:'Arcane Flow', desc:'INT+2. Enhances spell potency.', statBoosts:{int:2}, passive:'none' },
+    { id:'ward', name:'Arcane Ward', desc:'CON+2, WIS+1. Better survivability.', statBoosts:{con:2,wis:1}, passive:'none' },
+  ],
+  elementalist: [
+    { id:'stormcaller', name:'Stormcaller', desc:'INT+2. Raw elemental power.', statBoosts:{int:2}, passive:'none' },
+    { id:'stoneskin', name:'Stoneskin', desc:'CON+3. Earthen resilience.', statBoosts:{con:3}, passive:'none' },
+  ],
+  paladin: [
+    { id:'crusader', name:'Crusader', desc:'STR+2, CHA+1. Righteous fury.', statBoosts:{str:2,cha:1}, passive:'none' },
+    { id:'protector', name:'Protector', desc:'CON+2, WIS+1. Divine shield.', statBoosts:{con:2,wis:1}, passive:'none' },
+  ],
+  warlock: [
+    { id:'hexmaster', name:'Hexmaster', desc:'CHA+2. Stronger curses.', statBoosts:{cha:2}, passive:'none' },
+    { id:'darkResilience', name:'Dark Resilience', desc:'CON+2, INT+1. Pact-fueled endurance.', statBoosts:{con:2,int:1}, passive:'none' },
+  ],
+  berserker: [
+    { id:'bloodrage', name:'Blood Rage', desc:'STR+3. Unrelenting fury.', statBoosts:{str:3}, passive:'none' },
+    { id:'ironSkin', name:'Iron Skin', desc:'CON+2, DEX+1. Tough as nails.', statBoosts:{con:2,dex:1}, passive:'none' },
+  ],
+  cleric: [
+    { id:'radiance', name:'Radiance', desc:'WIS+2. Brighter divine power.', statBoosts:{wis:2}, passive:'none' },
+    { id:'bulwark', name:'Bulwark', desc:'CON+2, STR+1. Armored faith.', statBoosts:{con:2,str:1}, passive:'none' },
+  ],
+  necromancer: [
+    { id:'deathGrasp', name:'Death Grasp', desc:'INT+2. Stronger death magic.', statBoosts:{int:2}, passive:'none' },
+    { id:'undeadFortitude', name:'Undead Fortitude', desc:'CON+2, CHA+1. Undying resilience.', statBoosts:{con:2,cha:1}, passive:'none' },
+  ],
+  druid: [
+    { id:'wildGrowth', name:'Wild Growth', desc:'WIS+2. Nature amplified.', statBoosts:{wis:2}, passive:'none' },
+    { id:'barkArmor', name:'Bark Armor', desc:'CON+3. Living wood protection.', statBoosts:{con:3}, passive:'none' },
+  ],
+  sorcerer: [
+    { id:'wildMagic', name:'Wild Magic', desc:'CHA+2. Amplified chaos.', statBoosts:{cha:2}, passive:'none' },
+    { id:'focusedMind', name:'Focused Mind', desc:'INT+2, CON+1. Controlled sorcery.', statBoosts:{int:2,con:1}, passive:'none' },
+  ],
+  assassin: [
+    { id:'shadowStep', name:'Shadow Step', desc:'DEX+2. Swift and deadly.', statBoosts:{dex:2}, passive:'none' },
+    { id:'venomous', name:'Venomous', desc:'CON+2, INT+1. Toxin expertise.', statBoosts:{con:2,int:1}, passive:'none' },
+  ],
+  monk: [
+    { id:'innerFire', name:'Inner Fire', desc:'DEX+2. Lightning reflexes.', statBoosts:{dex:2}, passive:'none' },
+    { id:'ironBody', name:'Iron Body', desc:'CON+2, WIS+1. Hardened body and mind.', statBoosts:{con:2,wis:1}, passive:'none' },
+  ],
+};
+CLASSES.forEach(c => { if (!c.stances) c.stances = DEFAULT_STANCES[c.id] || null; });
 
 // ============================================================
 //  SPRITES
@@ -447,6 +540,7 @@ const SPRITES = {
   druid:     ['.xxx.xxx..','..xxxxxx..','..xxxxxx..','...xxxx...','..xxxxxx..','..xxxxxx..','..xxxxxx..','...xxxx...','..xx..xx..','..x....x..'],
   sorcerer:  ['...xxxx...','..xxxxxx..','..xxxxxx..','...xxxx...','..xxxxxx..','.xxxxxxxx.','..xxxxxx..','..xxxxxx..','...x..x...','...x..x...'],
   monk:      ['....xx....','...xxxx...','...xxxx...','...xxxx...','..xxxxxx..','..xxxxxx..','..xxxxxx..','...xxxx...','..xx..xx..','..x....x..'],
+  lich:      ['..x.xx.x..','...xxxx...','..xxxxxx..','..xxxxxx..','...xxxx...','.xxxxxxxx.','..xxxxxx..','..xxxxxx..','...x..x...','..xx..xx..'],
 };
 SPRITES.fighter = SPRITES.knight;
 
@@ -488,6 +582,7 @@ function createCombatant(cls, level) {
     currentHp: hp, maxHp: hp,
     abilities: cls.abilities.map(k => ({...ABILITIES[k], key:k, currentUses: ABILITIES[k].uses})),
     status: null, statusTurns: 0, fainted: false,
+    stance: null, stances: cls.stances || null,
   };
 }
 
@@ -507,7 +602,7 @@ function rollDamageForAbility(attacker, ability, crit) {
   return Math.max(1, rollDice(dc, sides) + ability.bonus + mod(attacker.stats[ability.stat]));
 }
 
-function getInitiative(c) { return d(20) + mod(c.stats.dex); }
+function getInitiative(c) { const base = d(20) + mod(c.stats.dex); return c.status === 'frozen' ? Math.floor(base * 0.4) : base; }
 
 // ============================================================
 //  GAME STATE
@@ -556,8 +651,9 @@ function renderActiveInfo(who) {
   const s = b.stats;
   document.getElementById(prefix + '-stats').innerHTML =
     `<span>STR ${s.str}</span><span>DEX ${s.dex}</span><span>CON ${s.con}</span><span>INT ${s.int}</span><span>WIS ${s.wis}</span><span>CHA ${s.cha}</span>`;
+  const stanceHtml = b.stance ? `<span class="stance-indicator">[${b.stance.name}]</span>` : '';
   document.getElementById(prefix + '-types').innerHTML =
-    `<span class="resist-tag">Resist: ${b.cls.resist}</span> | <span class="vuln-tag">Vuln: ${b.cls.vuln}</span>`;
+    `<span class="resist-tag">Resist: ${b.cls.resist}</span> | <span class="vuln-tag">Vuln: ${b.cls.vuln}</span>${stanceHtml}`;
   updateHpBar(who);
 }
 
@@ -636,6 +732,8 @@ function showTooltip(btn, ability) {
 
   const drainNote = ability.drain ? `<div class="tt-stat"><span class="tt-stat-label">Special</span><span class="tt-stat-val">Heals ${ability.drain*100}% of damage</span></div>` : '';
   const effectNote = ability.effect ? `<div class="tt-stat"><span class="tt-stat-label">Effect</span><span class="tt-stat-val">May inflict ${ability.effect}</span></div>` : '';
+  const freezeNote = ability.freezeChance ? `<div class="tt-stat"><span class="tt-stat-label">Freeze</span><span class="tt-stat-val">${ability.freezeChance*100}% chance</span></div>` : '';
+  const frozenReq = ability.requiresFrozen ? `<div class="tt-stat"><span class="tt-stat-label">Requires</span><span class="tt-stat-val" style="color:#8ad">Target must be FROZEN</span></div>` : '';
 
   tooltipEl.innerHTML = `
     <div class="tt-name">${ability.name}</div>
@@ -644,7 +742,7 @@ function showTooltip(btn, ability) {
       <div class="tt-stat"><span class="tt-stat-label">Dice</span><span class="tt-stat-val">${diceStr}</span></div>
       <div class="tt-stat"><span class="tt-stat-label">Accuracy</span><span class="tt-stat-val">${ability.acc === 99 ? 'Auto-hit' : (ability.acc >= 0 ? '+' : '') + ability.acc}</span></div>
       <div class="tt-stat"><span class="tt-stat-label">Uses</span><span class="tt-stat-val">${ability.currentUses} / ${ability.uses}</span></div>
-      ${drainNote}${effectNote}
+      ${drainNote}${effectNote}${freezeNote}${frozenReq}
     </div>
     ${ability.heal ? '' : `<div class="tt-variance ${s.varClass}">Variance: ${s.varLabel}</div>`}
     ${rangeHtml}
@@ -684,7 +782,7 @@ function renderMoves() {
       else if (eff < 1) effHint = ' [RESIST]';
     }
     btn.innerHTML = `<span class="move-name">${ab.name}${effHint}</span><span class="move-info">${tag} | ${diceStr} | ${ab.currentUses}/${ab.uses}</span>`;
-    btn.disabled = ab.currentUses <= 0 || isAnimating;
+    btn.disabled = ab.currentUses <= 0 || isAnimating || (ab.requiresFrozen && (!opponent() || opponent().status !== 'frozen'));
     btn.onclick = () => executeTurn(i);
     btn.onmouseenter = () => showTooltip(btn, ab);
     btn.onmouseleave = hideTooltip;
@@ -695,15 +793,77 @@ function renderMoves() {
 // ============================================================
 //  BATTLE FLOW
 // ============================================================
+// ============================================================
+//  STANCES
+// ============================================================
+function applyStance(combatant, stance) {
+  combatant.stance = stance;
+  if (stance.statBoosts) {
+    for (const [stat, val] of Object.entries(stance.statBoosts)) {
+      combatant.stats[stat] += val;
+    }
+    // Recalc HP if CON boosted
+    if (stance.statBoosts.con) {
+      const newMax = calcHP(combatant.stats.con, combatant.level);
+      const diff = newMax - combatant.maxHp;
+      combatant.maxHp = newMax;
+      combatant.currentHp += diff;
+    }
+  }
+}
+
+function removeStance(combatant) {
+  if (!combatant.stance) return;
+  if (combatant.stance.statBoosts) {
+    for (const [stat, val] of Object.entries(combatant.stance.statBoosts)) {
+      combatant.stats[stat] -= val;
+    }
+    if (combatant.stance.statBoosts.con) {
+      combatant.maxHp = calcHP(combatant.stats.con, combatant.level);
+      combatant.currentHp = Math.min(combatant.currentHp, combatant.maxHp);
+    }
+  }
+  combatant.stance = null;
+}
+
+function showStanceModal(combatant) {
+  return new Promise(resolve => {
+    const modal = document.getElementById('stance-modal');
+    const box = document.getElementById('stance-box');
+    box.innerHTML = `<h3>Choose stance for ${combatant.name} the ${combatant.cls.label}</h3>`;
+    combatant.stances.forEach(stance => {
+      const btn = document.createElement('button');
+      btn.className = 'stance-btn';
+      btn.innerHTML = `<div class="stance-name">${stance.name}</div><div class="stance-desc">${stance.desc}</div>`;
+      btn.onclick = () => { modal.classList.remove('show'); resolve(stance); };
+      box.appendChild(btn);
+    });
+    modal.classList.add('show');
+  });
+}
+
+function aiPickStance(combatant) {
+  return pick(combatant.stances);
+}
+
 function startBattle() {
   battleNum++;
   document.getElementById('battle-num').textContent = battleNum;
 
   const level = Math.min(20, 5 + Math.floor(battleNum / 3));
-  const shuffled = shuffle(CLASSES);
-  playerTeam = shuffled.slice(0, 4).map(c => createCombatant(c, level));
-  oppTeam = shuffled.slice(4, 8).map(c => createCombatant(c, level));
+  const lichCls = CLASSES.find(c => c.id === 'lich');
+  let available = shuffle(CLASSES.filter(c => c.id !== 'lich'));
+  // Guarantee Lich on player team
+  const playerClasses = [lichCls, ...available.splice(0, 3)];
+  const oppClasses = available.splice(0, 4);
+  playerTeam = shuffle(playerClasses).map(c => createCombatant(c, level));
+  oppTeam = oppClasses.map(c => createCombatant(c, level));
   playerActive = 0; oppActive = 0;
+
+  // Apply stances for AI team members with stances
+  oppTeam.forEach(b => { if (b.stances) { applyStance(b, aiPickStance(b)); } });
+  // Apply stances for non-active player team members (AI picks)
+  playerTeam.forEach((b, i) => { if (b.stances && i !== 0) { applyStance(b, aiPickStance(b)); } });
 
   renderActiveInfo('player'); renderActiveInfo('opponent');
   renderSprite('player'); renderSprite('opponent');
@@ -715,15 +875,42 @@ function startBattle() {
   log(`Enemy team: ${oppTeam.map(b => b.name + ' the ' + b.cls.label).join(', ')}`, 'info');
   log(`${player().name} the ${player().cls.label} steps into the arena.`, 'info');
   log(`${opponent().name} the ${opponent().cls.label} stands ready!`, 'info');
+
+  // Prompt stance for active player if they have stances
+  if (player().stances && !player().stance) {
+    promptPlayerStance(player());
+  }
+}
+
+async function promptPlayerStance(combatant) {
+  if (autoMode) { applyStance(combatant, aiPickStance(combatant)); renderActiveInfo('player'); renderMoves(); return; }
+  isAnimating = true;
+  const stance = await showStanceModal(combatant);
+  applyStance(combatant, stance);
+  log(`${combatant.name} enters ${stance.name} stance! ${stance.desc}`, 'info');
+  renderActiveInfo('player'); renderRoster('player'); renderMoves();
+  isAnimating = false;
 }
 
 async function doSwitch(newIdx) {
   if (isAnimating || playerTeam[newIdx].fainted) return;
   isAnimating = true;
-  const old = player().name;
+  const oldP = player();
+  removeStance(oldP);
   playerActive = newIdx;
-  log(`${old} withdraws! ${player().name} the ${player().cls.label} enters the battle!`, 'switch');
+  log(`${oldP.name} withdraws! ${player().name} the ${player().cls.label} enters the battle!`, 'switch');
   renderActiveInfo('player'); renderSprite('player'); renderRoster('player'); renderMoves();
+
+  // Stance selection for new active
+  if (player().stances && !player().stance) {
+    if (autoMode) { applyStance(player(), aiPickStance(player())); }
+    else {
+      const stance = await showStanceModal(player());
+      applyStance(player(), stance);
+      log(`${player().name} enters ${stance.name} stance!`, 'info');
+    }
+    renderActiveInfo('player'); renderRoster('player'); renderMoves();
+  }
 
   // Opponent gets a free attack
   await delay(400);
@@ -795,11 +982,28 @@ async function executeAbility(attacker, defender, ability) {
     if (attacker.statusTurns <= 0) { attacker.status = null; log(`${atkName} shakes off the stun!`, 'status'); }
     else { log(`${atkName} is stunned!`, 'status'); return; }
   }
+  if (attacker.status === 'frozen') {
+    const roll = Math.random();
+    if (roll < 0.333) {
+      attacker.status = null; attacker.statusTurns = 0;
+      log(`${atkName} thaws out and acts!`, 'status');
+      updateHpBar(isPlayer ? 'player' : 'opponent');
+    } else {
+      log(`${atkName} is frozen solid and can't move!`, 'status');
+      return;
+    }
+  }
   if (attacker.status === 'slow' && Math.random() < 0.33) {
     log(`${atkName} is slowed and fumbles!`, 'status'); return;
   }
 
   ability.currentUses = Math.max(0, ability.currentUses - 1);
+
+  // Shatter requires frozen target
+  if (ability.requiresFrozen && defender.status !== 'frozen') {
+    log(`${atkName} tries ${ability.name}, but ${defName} isn't frozen! The attack fails!`, 'miss');
+    return;
+  }
 
   if (ability.heal) {
     const heal = rollDamageForAbility(attacker, ability, false);
@@ -828,6 +1032,14 @@ async function executeAbility(attacker, defender, ability) {
   let dmg = rollDamageForAbility(attacker, ability, roll.crit);
   const mult = getEffectiveness(ability.dmgType, defender.cls.resist, defender.cls.vuln);
   dmg = Math.max(1, Math.floor(dmg * mult));
+
+  // Frozen target takes reduced damage but thaws
+  if (defender.status === 'frozen' && !ability.requiresFrozen) {
+    dmg = Math.max(1, Math.floor(dmg * 0.8));
+    defender.status = null; defender.statusTurns = 0;
+    log(`  ${defName} thaws from the impact! (damage slightly reduced)`, 'status');
+    updateHpBar(!isPlayer ? 'player' : 'opponent');
+  }
 
   const rollStr = roll.nat === 20 ? 'NAT 20!' : `${roll.nat} + mods = ${roll.total}`;
   log(`  Roll: ${rollStr} vs AC ${defender.ac} - Hit!`, 'roll');
@@ -862,7 +1074,28 @@ async function executeAbility(attacker, defender, ability) {
     updateHpBar(!isPlayer ? 'player' : 'opponent');
   }
 
-  if (defender.currentHp <= 0) { defender.fainted = true; animateFaint(defender); }
+  // Freeze chance (from ability or Arctic Aura stance)
+  if (!defender.status && !defender.fainted && defender.currentHp > 0) {
+    let freezeChance = ability.freezeChance || 0;
+    if (attacker.stance && attacker.stance.passive === 'freezeAll') freezeChance += 0.1;
+    if (freezeChance > 0 && Math.random() < freezeChance) {
+      defender.status = 'frozen'; defender.statusTurns = 99; // frozen doesn't use turn countdown
+      log(`  ${defName} is frozen solid!`, 'status');
+      updateHpBar(!isPlayer ? 'player' : 'opponent');
+    }
+  }
+
+  if (defender.currentHp <= 0) {
+    defender.fainted = true; animateFaint(defender);
+    // Soul Snatcher stance: heal on kill
+    if (attacker.stance && attacker.stance.passive === 'killHeal') {
+      const healAmt = Math.floor(attacker.maxHp * 0.2);
+      attacker.currentHp = Math.min(attacker.maxHp, attacker.currentHp + healAmt);
+      updateHpBar(isPlayer ? 'player' : 'opponent');
+      showDmgFloat(isPlayer ? 'player' : 'opponent', healAmt, false, true);
+      log(`  ${atkName}'s Soul Snatcher heals ${healAmt} HP!`, 'heal');
+    }
+  }
 }
 
 async function tickStatus(battler) {
@@ -882,6 +1115,7 @@ async function tickStatus(battler) {
     battler.statusTurns--;
     if (battler.statusTurns <= 0) { battler.status = null; log(`${battler.name} is no longer slowed.`, 'status'); }
   }
+  // Frozen doesn't tick down - it's handled at action time and on-damage
 }
 
 function animateFaint(b) {
@@ -954,10 +1188,12 @@ function pickAIAbility() {
   let best = -1, bestScore = -Infinity;
   o.abilities.forEach((ab, i) => {
     if (ab.currentUses <= 0 || ab.heal) return;
+    if (ab.requiresFrozen && player().status !== 'frozen') return;
     const statMod = mod(o.stats[ab.stat]);
     const avgDmg = ab.dice[0] * (ab.dice[1] + 1) / 2 + ab.bonus + statMod;
     const mult = getEffectiveness(ab.dmgType, player().cls.resist, player().cls.vuln);
-    const score = avgDmg * mult * (0.8 + Math.random() * 0.4);
+    let score = avgDmg * mult * (0.8 + Math.random() * 0.4);
+    if (ab.requiresFrozen && player().status === 'frozen') score *= 2; // prioritize shatter
     if (score > bestScore) { bestScore = score; best = i; }
   });
   if (best === -1) best = o.abilities.findIndex(a => a.currentUses > 0) || 0;
@@ -973,10 +1209,12 @@ function pickSmartMove() {
   let best = -1, bestScore = -Infinity;
   p.abilities.forEach((ab, i) => {
     if (ab.currentUses <= 0 || ab.heal) return;
+    if (ab.requiresFrozen && opponent().status !== 'frozen') return;
     const statMod = mod(p.stats[ab.stat]);
     const avgDmg = ab.dice[0] * (ab.dice[1] + 1) / 2 + ab.bonus + statMod;
     const mult = getEffectiveness(ab.dmgType, opponent().cls.resist, opponent().cls.vuln);
-    const score = avgDmg * mult * (0.85 + Math.random() * 0.3);
+    let score = avgDmg * mult * (0.85 + Math.random() * 0.3);
+    if (ab.requiresFrozen && opponent().status === 'frozen') score *= 2;
     if (score > bestScore) { bestScore = score; best = i; }
   });
   if (best === -1) best = p.abilities.findIndex(a => a.currentUses > 0) || 0;
