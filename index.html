@@ -1412,8 +1412,12 @@ async function executeAbility(attacker, defender, ability) {
     await dealHit(ability, 'First hit');
     if (!defender.fainted) {
       await delay(200);
-      const secondHitAbility = {...ability, fixed: Math.floor((ability.fixed || 0) * 1.5), doubleHit: false};
-      await dealHit(secondHitAbility, 'Second hit');
+      if (Math.random() < 0.3) {
+        log(`  Second hit misses!`, 'miss');
+      } else {
+        const secondHitAbility = {...ability, fixed: Math.floor((ability.fixed || 0) * 1.5), doubleHit: false};
+        await dealHit(secondHitAbility, 'Second hit');
+      }
     }
   } else {
     await dealHit(ability);
