@@ -547,8 +547,8 @@ const CLASSES = [
     stances: [
       { id:'arcticAura', name:'Arctic Aura', desc:'CON+2, CHA+2. Adds 10% freeze chance to ALL moves.',
         statBoosts:{con:2,cha:2}, passive:'freezeAll' },
-      { id:'soulSnatcher', name:'Soul Snatcher', desc:'INT+3. Heals 15% of damage dealt on all attacks.',
-        statBoosts:{int:3}, passive:'attackLifesteal' },
+      { id:'soulSnatcher', name:'Soul Snatcher', desc:'INT+2. Heals 10% of damage dealt on all attacks.',
+        statBoosts:{int:2}, passive:'attackLifesteal' },
     ]},
   { id:'rexRang', label:'Ranger', fixedName:'Rex Rang', color:'#6b8e23',
     statWeights:{atk:5.5,spd:3,con:3,int:0.5,def:2,cha:1},
@@ -1985,7 +1985,7 @@ async function executeAbility(attacker, defender, ability) {
 
     // Soul Snatcher: lifesteal on attacks
     if (attacker.stance?.passive === 'attackLifesteal' && dmg > 0 && !hitAbility.heal && attacker.currentHp < attacker.maxHp) {
-      const steal = Math.max(1, Math.floor(dmg * 0.15));
+      const steal = Math.max(1, Math.floor(dmg * 0.10));
       attacker.currentHp = Math.min(attacker.maxHp, attacker.currentHp + steal);
       updateHpBar(isPlayer ? 'player' : 'opponent');
       log(`  Soul Snatcher! ${atkName} drains ${steal} HP!`, 'heal');

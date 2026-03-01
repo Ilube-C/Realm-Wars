@@ -29,7 +29,7 @@ const AB={
 const CLS=[
   {id:'paladin',l:'Paladin',sw:{atk:3,spd:1,con:3,int:1.5,def:4,cha:3.5},ab:['radialStrike','heavenlyBlow','healingPrayer','heavenlyBlow'],st:[{sb:{cha:2},p:'bpt'},{sb:{def:2},p:'fb'}]},
   {id:'berserker',l:'Berserker',sw:{atk:4,spd:1.5,con:3,int:0.5,def:2,cha:1},ab:['tumpUp','counterThrow','subdue','deathLust'],st:[{sb:{con:2},p:'soh'},{sb:{def:2},p:'rt'}]},
-  {id:'mage',l:'Mage',sw:{atk:0.5,spd:1.5,con:1.5,int:5,def:2.5,cha:3},ab:['lichBlast','glaciate','lichLifeDrain','shatter'],st:[{sb:{con:2,cha:2},p:'fa'},{sb:{int:3},p:'al'}]},
+  {id:'mage',l:'Mage',sw:{atk:0.5,spd:1.5,con:1.5,int:5,def:2.5,cha:3},ab:['lichBlast','glaciate','lichLifeDrain','shatter'],st:[{sb:{con:2,cha:2},p:'fa'},{sb:{int:2},p:'al'}]},
   {id:'ranger',l:'Ranger',sw:{atk:4.5,spd:3,con:3,int:0.5,def:2,cha:1},ab:['battlerang','emberang','whittle','swerve'],st:[{sb:{atk:2},p:'bb'},{sb:{spd:2},p:'gs'}]},
   {id:'rogue',l:'Rogue',sw:{atk:3,spd:4,con:3,int:0.5,def:2,cha:1.5},ab:['poisonDart','goblinGas','remedialOintment','violentExtraction'],st:[{sb:{cha:2},p:'rpt'},{sb:{spd:2},p:'nt'}]},
   {id:'warrior',l:'Warrior',sw:{atk:4,spd:2,con:3.5,int:0.5,def:3,cha:1},ab:['recklessSwing','eviscerate','lexShieldBash','chivalry'],st:[{sb:{atk:3},p:'ov'},{sb:{def:2},p:'du'}]},
@@ -140,7 +140,7 @@ function eh(a,d2,ab,myTeam,enemyTeam){
     if(d2.ws>0&&dmg>0)dmg+=d2.ws*2;
     d2.chp-=dmg;d2.dtt=true;
     if(ab.rs&&dmg>0){a.chp=Math.max(1,a.chp-Math.max(1,Math.round(dmg*0.10)));}
-    if(a.stn?.p==='al'&&dmg>0)a.chp=Math.min(a.mhp,a.chp+Math.max(1,Math.floor(dmg*0.15)));
+    if(a.stn?.p==='al'&&dmg>0)a.chp=Math.min(a.mhp,a.chp+Math.max(1,Math.floor(dmg*0.10)));
     if(d2.status==='f'&&!ab.rqF){d2.status=null;}if(ab.rqF&&d2.status==='f'){d2.status=null;}
     if(ab.dr)a.chp=Math.min(a.mhp,a.chp+Math.round(dmg*ab.dr));
     if(ab.sl)d2.swl=true;
