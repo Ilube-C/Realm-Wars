@@ -104,8 +104,8 @@ function eh(a,d2,ab,myTeam,enemyTeam){
   if(ab.hl&&ab.hp){a.chp=Math.min(a.mhp,a.chp+Math.max(5,Math.round(a.mhp*0.25)));a.status=null;a.bs=0;a.brn=0;a.ps=0;a.ws=0;a.cs=0;ab.cu--;rs2();return;}
   if(ab.gdl){a.dlt=2;ab.cu--;rs2();return;}
   if(ab.gg){terrain={tl:5,e:'pb'};ab.cu--;rs2();return;}
-  if(ab.ro){const st=a.ps;if(st>0){a.ps=0;a.chp=Math.min(a.mhp,a.chp+st*7);}ab.cu--;rs2();return;}
-  if(ab.ve){const st=d2.ps;if(st>0){d2.ps=0;d2.chp-=st*12;d2.dtt=true;}ab.cu--;rs2();return;}
+  if(ab.ro){const st=a.ps;if(st>0){a.ps=0;a.chp=Math.min(a.mhp,a.chp+st*9);}ab.cu--;rs2();return;}
+  if(ab.ve){const st=d2.ps;if(st>0){d2.ps=0;d2.chp-=st*15;d2.dtt=true;}ab.cu--;rs2();return;}
   if(ab.ch){ab.cu--;a.cp=true;rs2();return;}
   if(ab.ap){if(!a.apq)a.apq=[];a.apq.push({tl:2,tgt:d2});ab.cu--;rs2();return;}
   if(ab.tr){if(a.status){d2.status=a.status;a.status=null;}if(a.ps>0){d2.ps+=a.ps;a.ps=0;}if(a.brn>0){d2.brn+=a.brn;a.brn=0;}if(a.bs>0){d2.bs+=a.bs;a.bs=0;}if(a.ws>0){d2.ws+=a.ws;a.ws=0;}if(a.cs>0){d2.cs+=a.cs;a.cs=0;}ab.cu--;rs2();return;}

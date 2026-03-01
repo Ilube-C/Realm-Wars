@@ -443,8 +443,8 @@ const ABILITIES = {
   // COUNT COCTION ABILITIES
   poisonDart:   { name:'Poison Dart',    dmgType:'physical', stat:'atk', fixed:7,  dice:[1,6],  acc:0,  uses:14, desc:'Quick physical strike. Always adds 2 stacks of poison (3 with Rapid Transmission).', poisonChance:1.00, poisonStacks:2 },
   goblinGas:    { name:'Goblin Gas',     dmgType:'physical', stat:'atk', fixed:0,  dice:[1,1],  acc:99, uses:4,  desc:'Deploy a poison gas cloud. Both fighters gain a poison stack each turn for 5 turns. Replaces existing terrain.', goblinGas:true },
-  remedialOintment:{ name:'Remedial Ointment', dmgType:'heal', stat:'cha', fixed:0, dice:[1,1], acc:99, uses:6, desc:'Remove all poison from yourself and heal 5 HP per stack removed.', remedialOintment:true, heal:true },
-  violentExtraction:{ name:'Violent Extraction', dmgType:'soul', stat:'atk', fixed:0, dice:[1,1], acc:99, uses:6, desc:'Rip all poison from the enemy. Deals 12 soul damage per stack removed.', violentExtraction:true },
+  remedialOintment:{ name:'Remedial Ointment', dmgType:'heal', stat:'cha', fixed:0, dice:[1,1], acc:99, uses:6, desc:'Remove all poison from yourself and heal 9 HP per stack removed.', remedialOintment:true, heal:true },
+  violentExtraction:{ name:'Violent Extraction', dmgType:'soul', stat:'atk', fixed:0, dice:[1,1], acc:99, uses:6, desc:'Rip all poison from the enemy. Deals 15 soul damage per stack removed.', violentExtraction:true },
   // VINY THE YOUNGER ABILITIES
   petalStorm:   { name:'Petal Storm',    dmgType:'magical',  stat:'int', fixed:5,  dice:[1,4],  acc:0,  uses:14, desc:'Whirl of sharp petals. Small magic damage with 50% chance (+CHA) to apply a blind stack.', petalStorm:true, blindChance:0.50 },
   battleBoar:   { name:'Battle Boar',    dmgType:'physical', stat:'int', fixed:0,  dice:[1,1],  acc:99, uses:2,  desc:'Summon a Battle Boar to replace you. Reduced speed — you take a hit first. The boar fights in your place but dies if switched out.', summonBoar:true, reducedPriority:true },
@@ -1825,7 +1825,7 @@ async function executeAbility(attacker, defender, ability) {
   if (ability.remedialOintment) {
     const stacks = attacker.poisonStacks;
     if (stacks > 0) {
-      const healAmt = stacks * 7;
+      const healAmt = stacks * 9;
       attacker.poisonStacks = 0;
       // Remove neurotoxin INT debuff
       if (defender.stance?.passive === 'neurotoxin') {
@@ -1846,7 +1846,7 @@ async function executeAbility(attacker, defender, ability) {
   if (ability.violentExtraction) {
     const stacks = defender.poisonStacks;
     if (stacks > 0) {
-      const dmg = stacks * 12;
+      const dmg = stacks * 15;
       defender.poisonStacks = 0;
       defender.currentHp = Math.max(0, defender.currentHp - dmg);
       defender.damagedThisTurn = true;
