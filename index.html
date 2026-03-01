@@ -426,8 +426,8 @@ const ABILITIES = {
   // PIT DWELLER ABILITIES
   tumpUp:       { name:'Tump Up',        dmgType:'physical', stat:'atk', fixed:7,  dice:[1,6],  acc:1,  uses:16, desc:'Hits twice. Second hit deals more damage but can miss.', doubleHit:true },
   counterThrow: { name:'Counter Throw',  dmgType:'physical', stat:'atk', fixed:10, dice:[2,6],  acc:0,  uses:10, desc:'Act with reduced speed. Deals bonus damage if opponent already hit you this turn.', counterMove:true },
-  subdue:       { name:'Subdue',         dmgType:'physical', stat:'atk', fixed:9,  dice:[1,6],  acc:1,  uses:12, desc:'Pin the opponent down. Prevents them from switching next turn.', lockSwitch:true },
-  deathLust:    { name:'Death Lust',     dmgType:'physical', stat:'atk', fixed:6,  dice:[1,4],  acc:99, uses:4,  desc:'Enter a frenzy. Grants bonus soul damage on all attacks for 2 turns. Lost on switching.', grantDeathLust:true },
+  subdue:       { name:'Subdue',         dmgType:'physical', stat:'atk', fixed:12, dice:[1,6],  acc:1,  uses:12, desc:'Pin the opponent down. Prevents them from switching next turn.', lockSwitch:true },
+  deathLust:    { name:'Death Lust',     dmgType:'physical', stat:'atk', fixed:6,  dice:[1,4],  acc:99, uses:4,  desc:'Enter a frenzy. Grants +50% bonus soul damage on all attacks for 3 turns. Lost on switching.', grantDeathLust:true },
 };
 
 // ============================================================
@@ -1144,8 +1144,8 @@ async function executeAbility(attacker, defender, ability) {
 
   // Death Lust: grant buff (self-buff move, also deals light damage)
   if (ability.grantDeathLust) {
-    attacker.deathLustTurns = 2;
-    log(`${atkName} enters Death Lust! Bonus soul damage for 2 turns.`, 'status');
+    attacker.deathLustTurns = 3;
+    log(`${atkName} enters Death Lust! +50% bonus soul damage for 3 turns.`, 'status');
   }
 
   log(`${atkName} uses ${ability.name}!`);
@@ -1177,7 +1177,7 @@ async function executeAbility(attacker, defender, ability) {
 
     // Death Lust: bonus soul damage on attacks
     if (attacker.deathLustTurns > 0 && !hitAbility.heal && !hitAbility.grantDeathLust) {
-      const soulBonus = Math.max(1, Math.floor(dmg * 0.3));
+      const soulBonus = Math.max(1, Math.floor(dmg * 0.5));
       dmg += soulBonus;
       log(`  Death Lust! +${soulBonus} bonus soul damage!`, 'status');
     }
