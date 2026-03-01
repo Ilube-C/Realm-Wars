@@ -1335,18 +1335,42 @@ async function doSwitch(newIdx) {
       renderActiveInfo('player'); renderRoster('player'); renderMoves();
     }
 
-    // Moonlight heal on switch-in
-    applyMoonlightHeal(player(), playerTeam, 'player');
-
-    // Opponent gets a free attack
-    await delay(1000);
-    const oppAbIdx = pickAIAbility();
-    const oppAb = opponent().abilities[oppAbIdx]?.currentUses > 0 ? opponent().abilities[oppAbIdx] : STRUGGLE;
-    await executeAbility(opponent(), player(), oppAb);
-
-    if (player().fainted) { await handleFaint('player'); }
-    if (!opponent().fainted) await tickStatus(opponent());
-    if (!player().fainted) await tickStatus(player());
+    // Check if AI also wants to switch simultaneously
+    const aiSwitchIdx = aiShouldSwitch();
+    if (aiSwitchIdx !== null && !window.TESTING_1V1) {
+      // Both sides switching — simultaneous! No free attacks.
+      log(`${opponent().name} also withdraws!`, 'switch');
+      clearEffectsOnSwitchOut(opponent());
+      oppActive = aiSwitchIdx;
+      opponent().justSwitchedIn = true;
+      log(`${opponent().name} the ${opponent().cls.label} enters the battle!`, 'switch');
+      renderActiveInfo('opponent'); renderSprite('opponent'); renderRoster('opponent');
+      // AI picks stance (but don't apply effects yet)
+      const aiStance = aiPickStance(opponent());
+      // Apply both stances without switch-in effects first
+      const playerStance = player().stance;
+      const oppUnit = opponent();
+      // Now apply AI stance (effects will check for Overwhelming)
+      applyStance(oppUnit, aiStance);
+      renderActiveInfo('opponent'); renderRoster('opponent');
+      // Moonlight heals
+      applyMoonlightHeal(player(), playerTeam, 'player');
+      applyMoonlightHeal(opponent(), oppTeam, 'opponent');
+      // Both switch — no free attacks, just tick
+      await delay(1000);
+      if (!player().fainted) await tickStatus(player());
+      if (!opponent().fainted) await tickStatus(opponent());
+    } else {
+      // Only player switched — opponent gets free attack
+      applyMoonlightHeal(player(), playerTeam, 'player');
+      await delay(1000);
+      const oppAbIdx = pickAIAbility();
+      const oppAb = opponent().abilities[oppAbIdx]?.currentUses > 0 ? opponent().abilities[oppAbIdx] : STRUGGLE;
+      await executeAbility(opponent(), player(), oppAb);
+      if (player().fainted) { await handleFaint('player'); }
+      if (!opponent().fainted) await tickStatus(opponent());
+      if (!player().fainted) await tickStatus(player());
+    }
   } finally {
     isAnimating = false;
   }
