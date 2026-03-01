@@ -22,7 +22,7 @@ const ABILITIES = {
   lichBlast:    { name:'Lich Blast',      dmgType:'magical',  stat:'int', fixed:8,  dice:[2,6],  uses:14, freezeChance:0.2 },
   glaciate:     { name:'Glaciate',        dmgType:'magical',  stat:'int', fixed:5,  dice:[1,4],  uses:16, freezeChance:0.6 },
   lichLifeDrain:{ name:'Life Drain',      dmgType:'soul',     stat:'int', fixed:7,  dice:[1,8],  uses:10, drain:0.5 },
-  shatter:{name:'Shatter',dmgType:'soul',stat:'int',fixed:12,dice:[2,4],uses:6,requiresFrozen:true,currentHpPct:0.4},
+  shatter:{name:'Shatter',dmgType:'soul',stat:'int',fixed:18,dice:[2,6],uses:6,requiresFrozen:true},
   tumpUp:       { name:'Tump Up',         dmgType:'physical', stat:'atk', fixed:5,  dice:[1,6],  uses:16, doubleHit:true },
   counterThrow: { name:'Counter Throw',   dmgType:'physical', stat:'atk', fixed:7,  dice:[1,6],  uses:10, counterMove:true, counterBonus:0.75 },
   subdue:       { name:'Subdue',          dmgType:'physical', stat:'atk', fixed:12, dice:[1,6],  uses:12, switchLock:true },
@@ -46,7 +46,7 @@ const CLASSES = [
     stances: [{ id:'dirtyBoxing', statBoosts:{con:2}, passive:'stunOnHit' }, { id:'pitVeteran', statBoosts:{def:2}, passive:'regenTick' }]},
   { id:'lich', label:'Mage', statWeights:{atk:0.5,spd:1.5,con:1.5,int:5,def:2.5,cha:3},
     abilities:['lichBlast','glaciate','lichLifeDrain','shatter'],
-    stances: [{ id:'arcticAura', statBoosts:{con:2,cha:2}, passive:'freezeAll' }, { id:'soulSnatcher', statBoosts:{int:3}, passive:'killHeal' }]},
+    stances: [{ id:'arcticAura', statBoosts:{con:2,cha:2}, passive:'freezeAll' }, { id:'soulSnatcher', statBoosts:{int:3}, passive:'attackLifesteal' }]},
   { id:'rexRang', label:'Ranger', statWeights:{atk:4.5,spd:3,con:3,int:0.5,def:2,cha:1},
     abilities:['battlerang','emberang','whittle','swerve'],
     stances: [{ id:'patientKiller', statBoosts:{atk:2}, passive:'boomerangBonus' }, { id:'guerillaFighter', statBoosts:{spd:2}, passive:'guerillaSwitchOut' }]},
@@ -193,7 +193,6 @@ function executeHit(attacker, defender, ability) {
     if (h > 0 && ability.doubleHit) dmg = Math.round(dmg * 1.5);
     if (ability.counterBonus && attacker.damagedThisTurn) dmg = Math.round(dmg * (1 + ability.counterBonus));
     if (attacker.deathLustTurns > 0 && !ability.heal && !ability.grantDeathLust) dmg += 5;
-    if (ability.currentHpPct && defender.currentHp > 0) dmg += Math.floor(defender.currentHp * ability.currentHpPct);
 
     defender.currentHp -= dmg;
     defender.damagedThisTurn = true;
@@ -221,7 +220,11 @@ function executeHit(attacker, defender, ability) {
     }
 
     // Kill heal
-    if (defender.currentHp <= 0 && attacker.stance?.passive === 'killHeal') {
+    // Attack lifesteal
+    if (attacker.stance?.passive === 'attackLifesteal' && dmg > 0 && attacker.currentHp < attacker.maxHp) {
+      attacker.currentHp = Math.min(attacker.maxHp, attacker.currentHp + Math.max(1, Math.floor(dmg * 0.15)));
+    }
+    if (defender.currentHp <= 0 && false) {
       attacker.currentHp = Math.min(attacker.maxHp, attacker.currentHp + Math.round(attacker.maxHp * 0.2));
     }
   }

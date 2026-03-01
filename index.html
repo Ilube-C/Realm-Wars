@@ -424,7 +424,7 @@ const ABILITIES = {
   lichBlast:    { name:'Lich Blast',      dmgType:'magical',  stat:'int', fixed:8,  dice:[2,6],  acc:0,  uses:14, desc:'Concentrated necrotic-arcane blast. High damage with a chance to freeze.', freezeChance:0.2 },
   glaciate:     { name:'Glaciate',        dmgType:'magical',  stat:'int', fixed:5,  dice:[1,4],  acc:1,  uses:16, desc:'Wave of absolute cold. Low damage but very high freeze chance.', freezeChance:0.6 },
   lichLifeDrain:{ name:'Life Drain',      dmgType:'magical',  stat:'int', fixed:7,  dice:[1,8],  acc:0,  uses:10, desc:'Siphon life force from the target. Heals proportion of damage dealt.', drain:0.5 },
-  shatter:      { name:'Shatter',         dmgType:'soul', stat:'int', fixed:12, dice:[2,4],  acc:1,  uses:6,  desc:'Shatter the frozen soul. Soul damage + 40% of target\'s current HP as bonus. ONLY works on frozen enemies.', requiresFrozen:true, currentHpPct:0.4 },
+  shatter:      { name:'Shatter',         dmgType:'soul', stat:'int', fixed:18, dice:[2,6],  acc:1,  uses:6,  desc:'Shatter the frozen soul. High soul damage — bypasses all defences. ONLY works on frozen enemies.', requiresFrozen:true },
   // PIT DWELLER ABILITIES
   tumpUp:       { name:'Tump Up',        dmgType:'physical', stat:'atk', fixed:5,  dice:[1,6],  acc:1,  uses:16, desc:'Hits twice. Second hit deals more damage but can miss.', doubleHit:true },
   counterThrow: { name:'Counter Throw',  dmgType:'physical', stat:'atk', fixed:7,  dice:[1,6],  acc:0,  uses:10, desc:'Act with reduced speed. Deals 75% bonus damage if opponent already hit you this turn.', counterMove:true },
@@ -523,8 +523,8 @@ const CLASSES = [
     stances: [
       { id:'arcticAura', name:'Arctic Aura', desc:'CON+2, CHA+2. Adds 10% freeze chance to ALL moves.',
         statBoosts:{con:2,cha:2}, passive:'freezeAll' },
-      { id:'soulSnatcher', name:'Soul Snatcher', desc:'INT+3. Heals 20% max HP on killing an enemy.',
-        statBoosts:{int:3}, passive:'killHeal' },
+      { id:'soulSnatcher', name:'Soul Snatcher', desc:'INT+3. Heals 15% of damage dealt on all attacks.',
+        statBoosts:{int:3}, passive:'attackLifesteal' },
     ]},
   { id:'rexRang', label:'Ranger', fixedName:'Rex Rang', color:'#6b8e23',
     statWeights:{atk:4.5,spd:3,con:3,int:0.5,def:2,cha:1},
@@ -1424,6 +1424,14 @@ async function executeAbility(attacker, defender, ability) {
     log(`  ${defName} takes ${dmg} ${hitAbility.dmgType} damage!`, 'damage');
     renderRoster(!isPlayer ? 'player' : 'opponent');
 
+    // Soul Snatcher: lifesteal on attacks
+    if (attacker.stance?.passive === 'attackLifesteal' && dmg > 0 && !hitAbility.heal && attacker.currentHp < attacker.maxHp) {
+      const steal = Math.max(1, Math.floor(dmg * 0.15));
+      attacker.currentHp = Math.min(attacker.maxHp, attacker.currentHp + steal);
+      updateHpBar(isPlayer ? 'player' : 'opponent');
+      log(`  Soul Snatcher! ${atkName} drains ${steal} HP!`, 'heal');
+    }
+
     // Shatter unfreezes after dealing bonus damage
     if (hitAbility.requiresFrozen && defender.status === 'frozen') {
       defender.status = null; defender.statusTurns = 0;
@@ -1539,10 +1547,10 @@ async function executeAbility(attacker, defender, ability) {
 
   if (defender.currentHp <= 0 && !defender.fainted) {
     defender.fainted = true; animateFaint(defender);
-    // Soul Snatcher stance: heal on kill
-    if (attacker.stance && attacker.stance.passive === 'killHeal') {
-      const healAmt = Math.floor(attacker.maxHp * 0.2);
-      attacker.currentHp = Math.min(attacker.maxHp, attacker.currentHp + healAmt);
+    // (killHeal removed — replaced by attackLifesteal)
+    if (false) {
+      const healAmt = 0;
+      attacker.currentHp = attacker.currentHp;
       updateHpBar(isPlayer ? 'player' : 'opponent');
       showDmgFloat(isPlayer ? 'player' : 'opponent', healAmt, false, true);
       log(`  ${atkName}'s Soul Snatcher heals ${healAmt} HP!`, 'heal');
