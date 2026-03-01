@@ -1357,6 +1357,37 @@ async function executeTurn(moveIdx) {
   try {
     const p = player(), o = opponent();
     const playerAb = p.abilities[moveIdx]?.currentUses > 0 ? p.abilities[moveIdx] : STRUGGLE;
+
+    // AI switch decision (made simultaneously with player's move choice)
+    const aiSwitchIdx = aiShouldSwitch();
+    if (aiSwitchIdx !== null && !window.TESTING_1V1) {
+      // AI switches out — player gets a free attack on the incoming unit
+      log(`${o.name} withdraws!`, 'switch');
+      clearEffectsOnSwitchOut(o);
+      oppActive = aiSwitchIdx;
+      const newOpp = opponent();
+      newOpp.justSwitchedIn = true;
+      log(`${newOpp.name} the ${newOpp.cls.label} enters the battle!`, 'switch');
+      renderActiveInfo('opponent'); renderSprite('opponent'); renderRoster('opponent');
+      // Pick and apply stance
+      applyStance(newOpp, aiPickStance(newOpp));
+      renderActiveInfo('opponent'); renderRoster('opponent');
+      if (newOpp.stance?.passive === 'flashyBlind') { p.blindStacks += 2; log(`Flashy Arrival! ${p.name} is blinded! (+2 stacks)`, 'status'); updateHpBar('player'); }
+      // Moonlight heal on switch-in
+      applyMoonlightHeal(newOpp, oppTeam, 'opponent');
+      // Player gets free attack
+      await delay(400);
+      await executeAbility(p, opponent(), playerAb);
+      if (opponent().fainted) { await handleFaint('opponent'); }
+      if (!p.fainted) await tickStatus(p);
+      if (!opponent().fainted) await tickStatus(opponent());
+      isAnimating = false;
+      renderMoves(); renderRoster('player'); renderRoster('opponent');
+      if (checkWin()) return;
+      if (autoMode) scheduleAutoTurn();
+      return;
+    }
+
     const oppAbIdx = pickAIAbility();
     const oppAb = o.abilities[oppAbIdx]?.currentUses > 0 ? o.abilities[oppAbIdx] : STRUGGLE;
 
@@ -2490,6 +2521,58 @@ function showDmgFloat(who, amount, isCrit, isHeal) {
 // ============================================================
 //  AI
 // ============================================================
+// AI switch decision: evaluates whether to swap out based on matchup + HP
+function aiShouldSwitch() {
+  const o = opponent();
+  const p = player();
+  // Can't switch if locked, pinned, or no bench
+  if (o.switchLocked || o.lookAtMeLocked) return null;
+  const bench = oppTeam.filter((m, i) => i !== oppActive && !m.fainted);
+  if (bench.length === 0) return null;
+  // Don't switch summons
+  if (o.isSummon) return null;
+
+  // Matchup scoring: how well does current unit do vs player's current unit?
+  function matchupScore(me, them) {
+    let s = 0;
+    // Physical attackers like low DEF targets
+    if (me.cls.statWeights.atk >= 3 && them.stats.def < 10) s += 15;
+    // Magic attackers like low INT targets
+    if (me.cls.statWeights.int >= 3 && them.stats.int < 10) s += 15;
+    // HP advantage
+    s += (me.currentHp / me.maxHp - them.currentHp / them.maxHp) * 20;
+    // Class-specific advantages
+    if (me.cls.name === 'Paladin' && them.cls.name === 'Rogue') s += 15;
+    if (me.cls.name === 'Mage' && them.cls.name === 'Paladin') s += 15;
+    if (me.cls.name === 'Warrior' && them.cls.name === 'Rogue') s += 15;
+    if (me.cls.name === 'Ranger' && them.cls.name === 'Paladin') s += 10;
+    if (me.cls.name === 'Ranger' && them.cls.name === 'Berserker') s += 10;
+    if (me.cls.name === 'Rogue' && them.cls.name === 'Berserker') s += 10;
+    if (me.cls.name === 'Rogue' && them.cls.name === 'Cleric') s += 20;
+    if (me.cls.name === 'Druid' && them.cls.name === 'Paladin') s += 10;
+    // Support classes prefer staying back
+    if (me.cls.name === 'Cleric') s -= 10;
+    return s;
+  }
+
+  const currentScore = matchupScore(o, p);
+  let bestBench = null, bestScore = currentScore;
+  for (const b of bench) {
+    const sc = matchupScore(b, p) + (b.currentHp / b.maxHp) * 10;
+    if (sc > bestScore) { bestScore = sc; bestBench = b; }
+  }
+
+  // Switch if critically low HP and a better option exists
+  if (o.currentHp < o.maxHp * 0.25 && bestBench && bestScore > currentScore + 10) {
+    return oppTeam.indexOf(bestBench);
+  }
+  // Switch if significantly better matchup available
+  if (bestBench && bestScore > currentScore + 25) {
+    return oppTeam.indexOf(bestBench);
+  }
+  return null;
+}
+
 function pickAIAbility() {
   const o = opponent();
   if (o.currentHp < o.maxHp * 0.3) {
