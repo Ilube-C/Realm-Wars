@@ -444,7 +444,7 @@ const ABILITIES = {
   poisonDart:   { name:'Poison Dart',    dmgType:'physical', stat:'atk', fixed:8,  dice:[1,6],  acc:0,  uses:14, desc:'Quick physical strike. High chance to add 3 stacks of poison (4 with Rapid Transmission).', poisonChance:0.60, poisonStacks:3 },
   goblinGas:    { name:'Goblin Gas',     dmgType:'physical', stat:'atk', fixed:0,  dice:[1,1],  acc:99, uses:4,  desc:'Deploy a poison gas cloud. Both fighters gain a poison stack each turn for 5 turns. Replaces existing terrain.', goblinGas:true },
   remedialOintment:{ name:'Remedial Ointment', dmgType:'heal', stat:'cha', fixed:0, dice:[1,1], acc:99, uses:6, desc:'Remove all poison from yourself and heal 5 HP per stack removed.', remedialOintment:true, heal:true },
-  violentExtraction:{ name:'Violent Extraction', dmgType:'soul', stat:'atk', fixed:0, dice:[1,1], acc:99, uses:6, desc:'Rip all poison from the enemy. Deals 10 soul damage per stack removed.', violentExtraction:true },
+  violentExtraction:{ name:'Violent Extraction', dmgType:'soul', stat:'atk', fixed:0, dice:[1,1], acc:99, uses:6, desc:'Rip all poison from the enemy. Deals 12 soul damage per stack removed.', violentExtraction:true },
   // LEXILAS ABILITIES
   recklessSwing: { name:'Reckless Swing', dmgType:'physical', stat:'atk', fixed:16, dice:[2,6], acc:0, uses:10, desc:'Devastating overhead swing. Deals 10% of damage dealt as recoil to self.', recklessSwing:true },
   eviscerate:    { name:'Eviscerate',      dmgType:'physical', stat:'atk', fixed:8,  dice:[1,6], acc:0, uses:14, desc:'Slash deep. Medium physical damage. Applies a stack of Wounded (bonus soul damage after being hit, switching removes 1 stack).', eviscerate:true },
@@ -1528,7 +1528,7 @@ async function executeAbility(attacker, defender, ability) {
   if (ability.violentExtraction) {
     const stacks = defender.poisonStacks;
     if (stacks > 0) {
-      const dmg = stacks * 10;
+      const dmg = stacks * 12;
       defender.poisonStacks = 0;
       defender.currentHp = Math.max(0, defender.currentHp - dmg);
       defender.damagedThisTurn = true;
