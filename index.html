@@ -453,6 +453,11 @@ const ABILITIES = {
   // BATTLE BOAR ABILITIES
   headbutt:     { name:'Headbutt',       dmgType:'physical', stat:'atk', fixed:6,  dice:[1,4],  acc:0,  uses:20, desc:'Ram your head into the enemy. Low damage but 25% chance to flinch.', flinchChance:0.25 },
   chomp:        { name:'Chomp',          dmgType:'physical', stat:'atk', fixed:4,  dice:[1,4],  acc:0,  uses:20, desc:'Bite down hard. Low damage but applies a stack of Wounded.', chomp:true },
+  // JAH APOSTLE ABILITIES
+  moonlight:     { name:'Moonlight',       dmgType:'heal',     stat:'int', fixed:0,  dice:[1,1],  acc:99, uses:8,  desc:'Bathe your team in moonlight. Heals all teammates (including benched) for a small amount.', moonlight:true, heal:true },
+  readScripture: { name:'Read Scripture',  dmgType:'soul',     stat:'int', fixed:4,  dice:[1,4],  acc:0,  uses:14, desc:'Read from the forbidden text. Low soul damage. 30% chance to deal high soul damage instead.', readScripture:true },
+  inviteJudgement:{ name:'Invite Judgement', dmgType:'soul',   stat:'int', fixed:0,  dice:[1,1],  acc:99, uses:6,  desc:'The character with the highest HP% loses 15% of their max HP. Ignores defences.', inviteJudgement:true },
+  lookAtMe:      { name:'Look at Me',     dmgType:'soul',     stat:'cha', fixed:0,  dice:[1,1],  acc:99, uses:6,  desc:'Prevent the target from switching this turn. If they try, your team gains a 2-turn shield.', lookAtMe:true },
   // LEXILAS ABILITIES
   recklessSwing: { name:'Reckless Swing', dmgType:'physical', stat:'atk', fixed:16, dice:[2,6], acc:0, uses:10, desc:'Devastating overhead swing. Deals 10% of damage dealt as recoil to self.', recklessSwing:true },
   eviscerate:    { name:'Eviscerate',      dmgType:'physical', stat:'atk', fixed:8,  dice:[1,6], acc:0, uses:14, desc:'Slash deep. Medium physical damage. Applies a stack of Wounded (bonus soul damage after being hit, switching removes 1 stack).', eviscerate:true },
@@ -578,6 +583,15 @@ const CLASSES = [
     stances: [
       { id:'prickly', name:'Prickly', desc:'Enemies attacking you take 1 damage.',
         statBoosts:{}, passive:'prickly' },
+    ]},
+  { id:'jahApostle', label:'Cleric', fixedName:'Jah Apostle', color:'#9966cc',
+    statWeights:{atk:0.5,spd:1,con:2,int:3.5,def:2,cha:3},
+    abilities:['moonlight','readScripture','inviteJudgement','lookAtMe'], sprite:'cleric',
+    stances: [
+      { id:'gekyumesBlessing', name:"Gekyume's Blessing", desc:'INT+2. Healing and shields are boosted by 30%.',
+        statBoosts:{int:2}, passive:'healBoost' },
+      { id:'forbiddenSermon', name:'Forbidden Sermon', desc:'CHA+2. At the end of each turn, apply a stack of Curse to the opponent.',
+        statBoosts:{cha:2}, passive:'cursePerTurn' },
     ]},
   { id:'lexilas', label:'Warrior', fixedName:'Lexilas', color:'#c4a035',
     statWeights:{atk:4,spd:2,con:3.5,int:0.5,def:3,cha:1},
@@ -735,6 +749,7 @@ function createCombatant(cls, level) {
     justSwitchedIn: false, overwhelmSuppressed: false, chivalryPending: false,
     ancientPowerPending: [], // [{turnsLeft, attacker(ref), target(ref)}]
     isSummon: cls.isSummon || false, summonOwner: null, // for boar: who summoned it
+    curseStacks: 0, shieldTurns: 0, lookAtMeLocked: false, // Cleric mechanics
   };
 }
 
@@ -841,6 +856,9 @@ function renderStatusEffects(b) {
   if (b.swerveActive) html += `<span class="status-effect-tag" style="background:#1a3a2a;color:#8c8">💨 SWERVING</span>`;
   if (b.whittleBoost > 0) html += `<span class="status-effect-tag" style="background:#3a2a1a;color:#ca8">🔪 WHETTED (+${b.whittleBoost} ATK)</span>`;
   if (b.woundedStacks > 0) html += `<span class="status-effect-tag" style="background:#4a1a2a;color:#e66">🩸 WOUNDED ×${b.woundedStacks}</span>`;
+  if (b.curseStacks > 0) html += `<span class="status-effect-tag" style="background:#2a1a3a;color:#a6c">👁 CURSED ×${b.curseStacks}</span>`;
+  if (b.shieldTurns > 0) html += `<span class="status-effect-tag" style="background:#1a2a4a;color:#6af">🛡 SHIELD (${b.shieldTurns}t)</span>`;
+  if (b.lookAtMeLocked) html += `<span class="status-effect-tag" style="background:#3a1a3a;color:#c6a">🔒 LOCKED</span>`;
   return html ? `<div class="status-effects-row">${html}</div>` : '';
 }
 
@@ -1175,18 +1193,18 @@ async function startBattle() {
   const countCoctionCls = CLASSES.find(c => c.id === 'countCoction');
   const lexilasCls = CLASSES.find(c => c.id === 'lexilas');
   const vinyCls = CLASSES.find(c => c.id === 'viny');
+  const jahCls = CLASSES.find(c => c.id === 'jahApostle');
   if (TESTING_1V1) {
     // 1v1 test mode: random matchup from custom characters
-    const customs = [lichCls, pitDwellerCls, sirShiningCls, rexRangCls, countCoctionCls, lexilasCls, vinyCls];
+    const customs = [lichCls, pitDwellerCls, sirShiningCls, rexRangCls, countCoctionCls, lexilasCls, vinyCls, jahCls];
     const shuffled = shuffle(customs);
     playerTeam = [createCombatant(shuffled[0], level)];
     oppTeam = [createCombatant(shuffled[1], level)];
   } else {
-    // Team mode: shuffle all custom characters, split into teams
-    const customs = shuffle([lichCls, pitDwellerCls, sirShiningCls, rexRangCls, countCoctionCls, lexilasCls, vinyCls]);
-    const teamSize = Math.floor(customs.length / 2); // 7→3v3 (one sits out), 8→4v4
-    playerTeam = customs.slice(0, teamSize).map(c => createCombatant(c, level));
-    oppTeam = customs.slice(teamSize, teamSize * 2).map(c => createCombatant(c, level));
+    // 4v4 mode: 8 characters, 4 each
+    const customs = shuffle([lichCls, pitDwellerCls, sirShiningCls, rexRangCls, countCoctionCls, lexilasCls, vinyCls, jahCls]);
+    playerTeam = customs.slice(0, 4).map(c => createCombatant(c, level));
+    oppTeam = customs.slice(4, 8).map(c => createCombatant(c, level));
   }
   playerActive = 0; oppActive = 0;
   terrain = null; // Reset terrain each battle
@@ -1244,6 +1262,21 @@ async function doSwitch(newIdx) {
   if (isAnimating || playerTeam[newIdx].fainted) return;
   if (player().switchLocked) {
     log(`${player().name} is pinned and can't switch!`, 'status');
+    return;
+  }
+  if (player().lookAtMeLocked) {
+    log(`${player().name} is locked by Look at Me and can't switch!`, 'status');
+    // Grant shield to opponent team
+    const oppTeamMembers = oppTeam;
+    let shieldTurns = 2;
+    if (opponent().stance?.passive === 'healBoost') shieldTurns = 3; // Gekyume's boost
+    for (const member of oppTeamMembers) {
+      if (!member.fainted) member.shieldTurns = Math.max(member.shieldTurns, shieldTurns);
+    }
+    log(`The opponent's team gains a ${shieldTurns}-turn shield from the failed switch!`, 'status');
+    updateHpBar('player'); updateHpBar('opponent');
+    renderRoster('player'); renderRoster('opponent');
+    player().lookAtMeLocked = false;
     return;
   }
   isAnimating = true;
@@ -1588,7 +1621,7 @@ async function executeAbility(attacker, defender, ability) {
     if (ability.healingPrayer) {
       const healAmt = Math.max(5, Math.floor(attacker.maxHp * 0.25));
       attacker.currentHp = Math.min(attacker.maxHp, attacker.currentHp + healAmt);
-      attacker.status = null; attacker.statusTurns = 0; attacker.blindStacks = 0; attacker.burnStacks = 0; attacker.poisonStacks = 0; attacker.woundedStacks = 0;
+      attacker.status = null; attacker.statusTurns = 0; attacker.blindStacks = 0; attacker.burnStacks = 0; attacker.poisonStacks = 0; attacker.woundedStacks = 0; attacker.curseStacks = 0;
       updateHpBar(isPlayer ? 'player' : 'opponent');
       showDmgFloat(isPlayer ? 'player' : 'opponent', healAmt, false, true);
       log(`${atkName} uses Healing Prayer! Healed ${healAmt} HP and cured all statuses!`, 'heal');
@@ -1675,6 +1708,12 @@ async function executeAbility(attacker, defender, ability) {
       attacker.blindStacks = 0;
       transferred = true;
     }
+    if (attacker.curseStacks > 0) {
+      defender.curseStacks += attacker.curseStacks;
+      log(`${atkName} transfers ${attacker.curseStacks} curse stacks to ${defName}!`, 'status');
+      attacker.curseStacks = 0;
+      transferred = true;
+    }
     if (attacker.woundedStacks > 0) {
       defender.woundedStacks += attacker.woundedStacks;
       log(`${atkName} transfers ${attacker.woundedStacks} wounded stacks to ${defName}!`, 'status');
@@ -1708,6 +1747,71 @@ async function executeAbility(attacker, defender, ability) {
     renderSprite(isPlayer ? 'player' : 'opponent');
     renderRoster(isPlayer ? 'player' : 'opponent');
     if (isPlayer) renderMoves();
+    return;
+  }
+
+  // Moonlight: heal all teammates including benched
+  if (ability.moonlight) {
+    const team = isPlayer ? playerTeam : oppTeam;
+    let baseHeal = Math.max(5, Math.floor(attacker.maxHp * 0.10));
+    // Gekyume's Blessing: boost healing by 30%
+    if (attacker.stance?.passive === 'healBoost') baseHeal = Math.floor(baseHeal * 1.3);
+    let totalHealed = 0;
+    for (const member of team) {
+      if (member.fainted || member.currentHp <= 0) continue;
+      // Include summon owners
+      const target = member.isSummon && member.summonOwner ? member.summonOwner : member;
+      if (target.fainted) continue;
+      const heal = Math.min(baseHeal, target.maxHp - target.currentHp);
+      if (heal > 0) {
+        target.currentHp += heal;
+        totalHealed += heal;
+      }
+    }
+    log(`${atkName} bathes the team in moonlight! Healed ${totalHealed} HP across all allies!`, 'heal');
+    updateHpBar('player'); updateHpBar('opponent');
+    renderRoster('player'); renderRoster('opponent');
+    return;
+  }
+
+  // Read Scripture: low soul damage, 30% chance high damage
+  if (ability.readScripture) {
+    // Don't return — fall through to normal damage, but modify the ability
+    const highRoll = Math.random() < 0.30;
+    if (highRoll) {
+      ability = {...ability, fixed: 14, dice: [2, 6]};
+      log(`${atkName} reads from the FORBIDDEN chapter!`, 'status');
+    }
+    // Fall through to normal hit
+  }
+
+  // Invite Judgement: highest HP% character loses 15% max HP
+  if (ability.inviteJudgement) {
+    // Find character with highest HP% across both teams
+    const allFighters = [...playerTeam, ...oppTeam].filter(f => !f.fainted && f.currentHp > 0);
+    let highest = null, highestPct = -1;
+    for (const f of allFighters) {
+      const pct = f.currentHp / f.maxHp;
+      if (pct > highestPct) { highestPct = pct; highest = f; }
+    }
+    if (highest) {
+      let lossAmt = Math.max(1, Math.floor(highest.maxHp * 0.15));
+      highest.currentHp = Math.max(1, highest.currentHp - lossAmt);
+      highest.damagedThisTurn = true;
+      const targetSide = playerTeam.includes(highest) ? 'player' : 'opponent';
+      showDmgFloat(targetSide, lossAmt, lossAmt > 15, false);
+      log(`Judgement falls on ${highest.name}! Loses ${lossAmt} HP (${Math.round(highestPct*100)}% was highest)!`, 'damage');
+      updateHpBar('player'); updateHpBar('opponent');
+      renderRoster('player'); renderRoster('opponent');
+    }
+    return;
+  }
+
+  // Look at Me: prevent switching + shield on attempt
+  if (ability.lookAtMe) {
+    defender.lookAtMeLocked = true;
+    log(`${atkName}: "Look at me!" ${defName} can't switch this turn!`, 'status');
+    updateHpBar(!isPlayer ? 'player' : 'opponent');
     return;
   }
 
@@ -1848,6 +1952,12 @@ async function executeAbility(attacker, defender, ability) {
     }
 
     const isBigHit = result.multiplier >= 1.2;
+
+    // Shield absorption: block damage while shield is active
+    if (defender.shieldTurns > 0 && dmg > 0 && !hitAbility.heal) {
+      log(`  ${defName}'s shield absorbs the hit!`, 'status');
+      dmg = 0;
+    }
 
     defender.currentHp = Math.max(0, defender.currentHp - dmg);
     defender.damagedThisTurn = true;
@@ -2112,9 +2222,49 @@ async function tickStatus(battler) {
 
   // Clear switch lock at end of turn
   battler.switchLocked = false;
+  battler.lookAtMeLocked = false;
 
   // Clear flinch
   battler.flinched = false;
+
+  // Shield decrement
+  if (battler.shieldTurns > 0) {
+    battler.shieldTurns--;
+    if (battler.shieldTurns <= 0) {
+      log(`${battler.name}'s shield fades.`, 'info');
+    }
+    updateHpBar(isPlayer ? 'player' : 'opponent');
+  }
+
+  // Curse tick: 35% chance per stack to transform into a random status
+  if (battler.curseStacks > 0 && !battler.fainted) {
+    const possibleStatuses = [];
+    if (!battler.status) possibleStatuses.push('frozen', 'stun');
+    else if (battler.status === 'frozen') possibleStatuses.push('stun');
+    else if (battler.status === 'stun') possibleStatuses.push('frozen');
+    // Each stack has independent 35% chance
+    for (let i = 0; i < battler.curseStacks; i++) {
+      if (possibleStatuses.length > 0 && Math.random() < 0.35) {
+        const newStatus = possibleStatuses[Math.floor(Math.random() * possibleStatuses.length)];
+        battler.status = newStatus;
+        battler.statusTurns = newStatus === 'frozen' ? 3 : 1;
+        battler.curseStacks--;
+        log(`${battler.name}'s curse manifests as ${newStatus.toUpperCase()}!`, 'status');
+        updateHpBar(isPlayer ? 'player' : 'opponent');
+        break; // Only one transformation per turn
+      }
+    }
+  }
+
+  // Forbidden Sermon: apply curse stack to opponent
+  if (battler.stance?.passive === 'cursePerTurn' && !battler.fainted) {
+    const target = isPlayer ? opponent() : player();
+    if (target && !target.fainted && target.currentHp > 0) {
+      target.curseStacks++;
+      log(`Forbidden Sermon! ${target.name} gains a curse stack! (${target.curseStacks})`, 'status');
+      updateHpBar(!isPlayer ? 'player' : 'opponent');
+    }
+  }
 
   // Swerve: track for consecutive use penalty, then clear
   battler.swerveLastTurn = !!battler.swerveActive;
@@ -2344,6 +2494,10 @@ function pickAIAbility() {
     else if (ab.transference) { score = ((o.poisonStacks + o.burnStacks + o.blindStacks + o.woundedStacks) * 6 + (o.status ? 15 : 0)) * (0.8 + Math.random() * 0.4); }
     else if (ab.summonBoar) { score = (o.currentHp < o.maxHp * 0.4 ? 30 : 10) * (0.8 + Math.random() * 0.4); } // Summon when low HP to preserve Druid
     else if (ab.chomp) { score = 10 * (0.8 + Math.random() * 0.4); }
+    else if (ab.moonlight) { const hurt = oppTeam.filter(m => !m.fainted && m.currentHp < m.maxHp * 0.8).length; score = (hurt > 0 ? hurt * 12 : 3) * (0.8 + Math.random() * 0.4); }
+    else if (ab.readScripture) { score = 12 * (0.8 + Math.random() * 0.4); }
+    else if (ab.inviteJudgement) { score = 18 * (0.8 + Math.random() * 0.4); }
+    else if (ab.lookAtMe) { score = 10 * (0.8 + Math.random() * 0.4); }
     else {
       const avgDmg = (ab.fixed || 0) + ab.dice[0] * (ab.dice[1] + 1) / 2;
       score = avgDmg * (0.8 + Math.random() * 0.4);
@@ -2379,6 +2533,10 @@ function pickSmartMove() {
     else if (ab.ancientPower) { score = 22 * (0.85 + Math.random() * 0.3); }
     else if (ab.transference) { score = ((p.poisonStacks + p.burnStacks + p.blindStacks + p.woundedStacks) * 6 + (p.status ? 15 : 0)) * (0.85 + Math.random() * 0.3); }
     else if (ab.summonBoar) { score = (p.currentHp < p.maxHp * 0.4 ? 30 : 10) * (0.85 + Math.random() * 0.3); }
+    else if (ab.moonlight) { const hurt = playerTeam.filter(m => !m.fainted && m.currentHp < m.maxHp * 0.8).length; score = (hurt > 0 ? hurt * 12 : 3) * (0.85 + Math.random() * 0.3); }
+    else if (ab.readScripture) { score = 12 * (0.85 + Math.random() * 0.3); }
+    else if (ab.inviteJudgement) { score = 18 * (0.85 + Math.random() * 0.3); }
+    else if (ab.lookAtMe) { score = 10 * (0.85 + Math.random() * 0.3); }
     else if (ab.chomp) { score = 10 * (0.85 + Math.random() * 0.3); }
     else {
       const avgDmg = (ab.fixed || 0) + ab.dice[0] * (ab.dice[1] + 1) / 2;
