@@ -455,8 +455,8 @@ const ABILITIES = {
   chomp:        { name:'Chomp',          dmgType:'physical', stat:'atk', fixed:4,  dice:[1,4],  acc:0,  uses:20, desc:'Bite down hard. Low damage but applies a stack of Wounded.', chomp:true },
   // JAH APOSTLE ABILITIES
   moonlight:     { name:'Moonlight',       dmgType:'heal',     stat:'int', fixed:0,  dice:[1,1],  acc:99, uses:8,  desc:'Channel moonlight. Heals self for 25% max HP. The next ally to switch in is also healed for the same amount.', moonlight:true, heal:true },
-  readScripture: { name:'Read Scripture',  dmgType:'soul',     stat:'int', fixed:7,  dice:[1,6],  acc:0,  uses:14, desc:'Read from the forbidden text. Low soul damage. 30% chance to deal high soul damage instead.', readScripture:true },
-  inviteJudgement:{ name:'Invite Judgement', dmgType:'soul',   stat:'int', fixed:0,  dice:[1,1],  acc:99, uses:6,  desc:'The active opponent loses 20% of their max HP. Ignores defences.', inviteJudgement:true },
+  readScripture: { name:'Read Scripture',  dmgType:'soul',     stat:'int', fixed:10, dice:[1,8],  acc:0,  uses:14, desc:'Medium soul damage. Variable curse stacks: 50% none, 25% one, 15% two, 10% three.', readScripture:true },
+  riot:          { name:'Riot',           dmgType:'soul',     stat:'int', fixed:5,  dice:[1,4],  acc:0,  uses:12, desc:'Low soul damage. Applies 2 curse stacks and 1 burn stack.', riot:true },
   lookAtMe:      { name:'Look at Me',     dmgType:'soul',     stat:'cha', fixed:0,  dice:[1,1],  acc:99, uses:6,  desc:'Prevent the target from switching this turn. If they try, your team gains a 2-turn shield.', lookAtMe:true },
   // LEXILAS ABILITIES
   recklessSwing: { name:'Reckless Swing', dmgType:'physical', stat:'atk', fixed:14, dice:[2,6], acc:0, uses:10, desc:'Devastating overhead swing. Deals 10% of damage dealt as recoil to self.', recklessSwing:true },
@@ -586,7 +586,7 @@ const CLASSES = [
     ]},
   { id:'jahApostle', label:'Cleric', fixedName:'Jah Apostle', color:'#9966cc',
     statWeights:{atk:0.5,spd:1,con:2,int:3.5,def:2,cha:3},
-    abilities:['moonlight','readScripture','inviteJudgement','lookAtMe'], sprite:'cleric',
+    abilities:['moonlight','readScripture','riot','lookAtMe'], sprite:'cleric',
     stances: [
       { id:'gekyumesBlessing', name:"Gekyume's Blessing", desc:'INT+2. Healing and shields are boosted by 30%.',
         statBoosts:{int:2}, passive:'healBoost' },
@@ -1787,33 +1787,29 @@ async function executeAbility(attacker, defender, ability) {
     return;
   }
 
-  // Read Scripture: low soul damage, 30% chance high damage
+  // Read Scripture: medium soul damage + variable curse stacks
   if (ability.readScripture) {
-    // Don't return — fall through to normal damage, but modify the ability
-    const highRoll = Math.random() < 0.30;
-    if (highRoll) {
-      ability = {...ability, fixed: 14, dice: [2, 6]};
-      log(`${atkName} reads from the FORBIDDEN chapter!`, 'status');
+    // Determine curse stacks: 50% none, 25% one, 15% two, 10% three
+    const roll = Math.random();
+    let curseStacks = 0;
+    if (roll < 0.10) curseStacks = 3;
+    else if (roll < 0.25) curseStacks = 2;
+    else if (roll < 0.50) curseStacks = 1;
+    if (curseStacks > 0) {
+      defender.curseStacks += curseStacks;
+      log(`${atkName}'s scripture curses ${defName}! (+${curseStacks} curse stack${curseStacks>1?'s':''}, total ${defender.curseStacks})`, 'status');
+      updateHpBar(!isPlayer ? 'player' : 'opponent');
     }
-    // Fall through to normal hit
+    // Fall through to normal hit for damage
   }
 
-  // Invite Judgement: active enemy with highest HP% loses 20% max HP
-  if (ability.inviteJudgement) {
-    // Only targets the active opponent
-    const target = defender;
-    if (target && !target.fainted && target.currentHp > 0) {
-      const pct = target.currentHp / target.maxHp;
-      let lossAmt = Math.max(1, Math.floor(target.maxHp * 0.20));
-      target.currentHp = Math.max(1, target.currentHp - lossAmt);
-      target.damagedThisTurn = true;
-      const targetSide = !isPlayer ? 'player' : 'opponent';
-      showDmgFloat(targetSide, lossAmt, lossAmt > 15, false);
-      log(`Judgement falls on ${target.name}! Loses ${lossAmt} HP (${Math.round(pct*100)}% HP)!`, 'damage');
-      updateHpBar('player'); updateHpBar('opponent');
-      renderRoster('player'); renderRoster('opponent');
-    }
-    return;
+  // Riot: low soul damage + 2 curse stacks + 1 burn stack
+  if (ability.riot) {
+    defender.curseStacks += 2;
+    defender.burnStacks += 1;
+    log(`${atkName} incites a riot! ${defName} gains 2 curse stacks and 1 burn stack!`, 'status');
+    updateHpBar(!isPlayer ? 'player' : 'opponent');
+    // Fall through to normal hit for damage
   }
 
   // Look at Me: prevent switching + shield on attempt
@@ -2524,7 +2520,7 @@ function pickAIAbility() {
     else if (ab.chomp) { score = 10 * (0.8 + Math.random() * 0.4); }
     else if (ab.moonlight) { const hurt = oppTeam.filter(m => !m.fainted && m.currentHp < m.maxHp * 0.8).length; score = (hurt > 0 ? hurt * 12 : 3) * (0.8 + Math.random() * 0.4); }
     else if (ab.readScripture) { score = 12 * (0.8 + Math.random() * 0.4); }
-    else if (ab.inviteJudgement) { score = 18 * (0.8 + Math.random() * 0.4); }
+    else if (ab.riot) { score = 18 * (0.8 + Math.random() * 0.4); }
     else if (ab.lookAtMe) { score = 10 * (0.8 + Math.random() * 0.4); }
     else {
       const avgDmg = (ab.fixed || 0) + ab.dice[0] * (ab.dice[1] + 1) / 2;
@@ -2563,7 +2559,7 @@ function pickSmartMove() {
     else if (ab.summonBoar) { score = (p.currentHp < p.maxHp * 0.4 ? 30 : 10) * (0.85 + Math.random() * 0.3); }
     else if (ab.moonlight) { const hurt = playerTeam.filter(m => !m.fainted && m.currentHp < m.maxHp * 0.8).length; score = (hurt > 0 ? hurt * 12 : 3) * (0.85 + Math.random() * 0.3); }
     else if (ab.readScripture) { score = 12 * (0.85 + Math.random() * 0.3); }
-    else if (ab.inviteJudgement) { score = 18 * (0.85 + Math.random() * 0.3); }
+    else if (ab.riot) { score = 18 * (0.85 + Math.random() * 0.3); }
     else if (ab.lookAtMe) { score = 10 * (0.85 + Math.random() * 0.3); }
     else if (ab.chomp) { score = 10 * (0.85 + Math.random() * 0.3); }
     else {

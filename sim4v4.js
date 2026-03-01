@@ -5,25 +5,25 @@ const SN=['atk','def','con','int','cha','spd'];
 function gs(w){const s={};SN.forEach(n=>s[n]=5);let p=42;const tw=SN.reduce((a,n)=>a+(w[n]||1),0);while(p>0){let r=Math.random()*tw;for(const n of SN){r-=(w[n]||1);if(r<=0){if(s[n]<20){s[n]++;p--}break}}}return s}
 function chab(a,d2){return Math.max(0,(a-d2))*0.02}
 const AB={
-  lichBlast:{t:'m',s:'int',f:7,dc:[2,6],u:14,fc:0.2},glaciate:{t:'m',s:'int',f:5,dc:[1,4],u:16,fc:0.6},
-  lichLifeDrain:{t:'s',s:'int',f:6,dc:[1,8],u:10,dr:0.5},shatter:{t:'s',s:'int',f:18,dc:[2,6],u:6,rqF:1},
-  tumpUp:{t:'p',s:'atk',f:5,dc:[1,6],u:16,dh:1},counterThrow:{t:'p',s:'atk',f:7,dc:[1,6],u:10,cm:1,cbo:0.75},
-  subdue:{t:'p',s:'atk',f:12,dc:[1,6],u:12,sl:1},deathLust:{t:'p',s:'atk',f:6,dc:[1,4],u:4,gdl:1},
-  radialStrike:{t:'p',s:'atk',f:9,dc:[1,6],u:16,bc:0.4},heavenlyBlow:{t:'p',s:'atk',f:8,dc:[1,8],u:10,sd:1},
+  lichBlast:{t:'m',s:'int',f:8,dc:[2,6],u:14,fc:0.2},glaciate:{t:'m',s:'int',f:6,dc:[1,4],u:16,fc:0.6},
+  lichLifeDrain:{t:'s',s:'int',f:7,dc:[1,8],u:10,dr:0.5},shatter:{t:'s',s:'int',f:20,dc:[2,6],u:6,rqF:1},
+  tumpUp:{t:'p',s:'atk',f:4,dc:[1,6],u:16,dh:1},counterThrow:{t:'p',s:'atk',f:6,dc:[1,6],u:10,cm:1,cbo:0.75},
+  subdue:{t:'p',s:'atk',f:11,dc:[1,6],u:12,sl:1},deathLust:{t:'p',s:'atk',f:6,dc:[1,4],u:4,gdl:1},
+  radialStrike:{t:'p',s:'atk',f:8,dc:[1,6],u:16,bc:0.4},heavenlyBlow:{t:'p',s:'atk',f:7,dc:[1,8],u:10,sd:1},
   healingPrayer:{t:'h',s:'cha',f:0,dc:[1,1],u:4,hp:1,hl:1},
-  battlerang:{t:'p',s:'atk',f:8,dc:[1,6],u:14,bm:1,fl:0.25},emberang:{t:'p',s:'atk',f:5,dc:[1,6],u:12,bm:1,bn:0.35},
+  battlerang:{t:'p',s:'atk',f:7,dc:[1,6],u:14,bm:1,fl:0.25},emberang:{t:'p',s:'atk',f:4,dc:[1,6],u:12,bm:1,bn:0.35},
   whittle:{t:'p',s:'atk',f:4,dc:[1,4],u:4,gw:1},swerve:{t:'p',s:'atk',f:0,dc:[1,1],u:10,sw:1},
-  poisonDart:{t:'p',s:'atk',f:8,dc:[1,6],u:14,pc:0.60,pst:3},goblinGas:{t:'p',s:'atk',f:0,dc:[1,1],u:4,gg:1},
+  poisonDart:{t:'p',s:'atk',f:7,dc:[1,6],u:14,pc:0.60,pst:3},goblinGas:{t:'p',s:'atk',f:0,dc:[1,1],u:4,gg:1},
   remedialOintment:{t:'h',s:'cha',f:0,dc:[1,1],u:6,ro:1,hl:1},violentExtraction:{t:'s',s:'atk',f:0,dc:[1,1],u:6,ve:1},
-  recklessSwing:{t:'p',s:'atk',f:16,dc:[2,6],u:10,rs:1},eviscerate:{t:'p',s:'atk',f:8,dc:[1,6],u:14,ev:1},
-  lexShieldBash:{t:'p',s:'atk',f:7,dc:[1,4],u:16,sb:1,sc:0.35},chivalry:{t:'h',s:'def',f:0,dc:[1,1],u:6,ch:1,hl:1},
-  petalStorm:{t:'m',s:'int',f:4,dc:[1,4],u:14,pst2:1,blc:0.50},
-  ancientPower:{t:'m',s:'int',f:14,dc:[2,6],u:6,ap:1},
+  recklessSwing:{t:'p',s:'atk',f:14,dc:[2,6],u:10,rs:1},eviscerate:{t:'p',s:'atk',f:7,dc:[1,6],u:14,ev:1},
+  lexShieldBash:{t:'p',s:'atk',f:6,dc:[1,4],u:16,sb:1,sc:0.35},chivalry:{t:'h',s:'def',f:0,dc:[1,1],u:6,ch:1,hl:1},
+  petalStorm:{t:'m',s:'int',f:5,dc:[1,4],u:14,pst2:1,blc:0.50},
+  ancientPower:{t:'m',s:'int',f:15,dc:[2,6],u:6,ap:1},
   transference:{t:'s',s:'int',f:0,dc:[1,1],u:4,tr:1},
   // Cleric
   moonlight:{t:'h',s:'int',f:0,dc:[1,1],u:8,ml:1,hl:1},
-  readScripture:{t:'s',s:'int',f:6,dc:[1,6],u:14,rs2:1},
-  inviteJudgement:{t:'s',s:'int',f:0,dc:[1,1],u:6,ij:1},
+  readScripture:{t:'s',s:'int',f:10,dc:[1,8],u:14,rs2:1},
+  riot:{t:'s',s:'int',f:5,dc:[1,4],u:12,ri:1},
   lookAtMe:{t:'s',s:'cha',f:0,dc:[1,1],u:6,lam:1},
 };
 const CLS=[
@@ -34,7 +34,7 @@ const CLS=[
   {id:'rogue',l:'Rogue',sw:{atk:3,spd:4,con:3,int:0.5,def:2,cha:1.5},ab:['poisonDart','goblinGas','remedialOintment','violentExtraction'],st:[{sb:{cha:2},p:'rpt'},{sb:{spd:2},p:'nt'}]},
   {id:'warrior',l:'Warrior',sw:{atk:4,spd:2,con:3.5,int:0.5,def:3,cha:1},ab:['recklessSwing','eviscerate','lexShieldBash','chivalry'],st:[{sb:{atk:3},p:'ov'},{sb:{def:2},p:'du'}]},
   {id:'druid',l:'Druid',sw:{atk:0.5,spd:1,con:1,int:3.5,def:1.5,cha:2},ab:['petalStorm','ancientPower','transference','petalStorm'],st:[{sb:{int:2},p:'og',ogE:1},{sb:{con:2},p:'rest'}]},
-  {id:'cleric',l:'Cleric',sw:{atk:0.5,spd:1,con:2,int:3.5,def:2,cha:3},ab:['moonlight','readScripture','inviteJudgement','lookAtMe'],st:[{sb:{int:2},p:'hb'},{sb:{cha:2},p:'cpt'}]},
+  {id:'cleric',l:'Cleric',sw:{atk:0.5,spd:1,con:2,int:3.5,def:2,cha:3},ab:['moonlight','readScripture','riot','lookAtMe'],st:[{sb:{int:2},p:'hb'},{sb:{cha:2},p:'cpt'}]},
 ];
 let terrain=null;
 function cr(cls){const stats=gs(cls.sw);const hp=20+stats.con*4;return{cls,nm:cls.l,stats,origStats:{...stats},mhp:hp,chp:hp,ab:cls.ab.map(id=>{const a=AB[id];return{...a,id,cu:a.u}}),st:cls.st,stn:null,status:null,dlt:0,dtt:false,bs:0,brn:0,bh:[],sa:false,slt:false,wb:0,fl:false,ps:0,swl:false,ds:0,cp:false,ws:0,fainted:false,apq:[],cs:0,st2:0,shp:0,mlHeal:0,lookAtMeLocked:false};}
@@ -83,8 +83,8 @@ function am(a,d2,myTeam){
     if(x.tr)return(a.ps+a.brn+a.bs+a.ws+a.cs)*6+(a.status?15:0);
     // Cleric moves
     if(x.ml){const hurt=myTeam?myTeam.filter(m=>!m.fainted&&m.chp<m.mhp*0.8).length:0;return hurt>0?hurt*12:3;}
-    if(x.rs2)return 12;
-    if(x.ij)return 18;
+    if(x.rs2)return 15;
+    if(x.ri)return 16;
     if(x.lam)return 10;
     let avg=x.f+x.dc[0]*(x.dc[1]+1)/2;if(x.dh)avg*=1.8;if(x.cbo&&a.dtt)avg*=1.75;if(x.rqF)avg*=1.3;if(x.bm)avg*=1.4;return avg;
   });
@@ -116,15 +116,14 @@ function eh(a,d2,ab,myTeam,enemyTeam){
     a.mlHeal=Math.floor(heal); // stored for next ally switch-in
     ab.cu--;rs2();return;
   }
-  // Invite Judgement: active opponent loses 20% max HP
-  if(ab.ij){
-    const loss=Math.max(1,Math.floor(d2.mhp*0.20));d2.chp=Math.max(1,d2.chp-loss);d2.dtt=true;
-    ab.cu--;rs2();return;
-  }
+  // Riot: low soul dmg + 2 curse + 1 burn (falls through to hit)
+  if(ab.ri){d2.cs+=2;d2.brn++;}
+  // Read Scripture: variable curse stacks (falls through to hit)
+  if(ab.rs2){const r=Math.random();let cs=0;if(r<0.10)cs=3;else if(r<0.25)cs=2;else if(r<0.50)cs=1;if(cs>0)d2.cs+=cs;}
   // Look at Me: switch lock
   if(ab.lam){d2.lookAtMeLocked=true;ab.cu--;rs2();return;}
   // Read Scripture: 30% high damage
-  if(ab.rs2&&Math.random()<0.30){ab={...ab,f:14,dc:[2,6]};}
+  // (Read Scripture curse applied above, damage handled by normal hit below)
   let sbDef=0,sbSpd=0;if(ab.sb){sbDef=4;sbSpd=Math.floor(a.stats.spd*0.4);a.stats.def+=sbDef;a.stats.spd-=sbSpd;}
   ab.cu--;
   for(let h=0;h<(ab.dh?2:1);h++){
@@ -182,7 +181,7 @@ function tk(b,enemy){
     }
   }
   // Forbidden Sermon: curse per turn
-  if(b.stn?.p==='cpt'&&b.chp>0&&enemy&&enemy.chp>0){enemy.cs++;}
+  if(b.stn?.p==='cpt'&&b.chp>0&&enemy&&enemy.chp>0){enemy.cs+=2;}
   if(b.brn>0&&b.chp>0){b.chp=Math.max(0,b.chp-Math.max(1,Math.floor(b.mhp*0.04*b.brn)));if(Math.random()<0.5)b.brn--;}
   if(b.ps>0&&b.chp>0){b.chp=Math.max(0,b.chp-b.ps*2);}
   if(b.bh.length>0&&b.chp>0){for(const h of b.bh.splice(0)){b.chp=Math.max(0,b.chp-h.dm);if(b.chp<=0)break;}}
