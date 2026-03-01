@@ -527,7 +527,7 @@ const CLASSES = [
         statBoosts:{int:3}, passive:'killHeal' },
     ]},
   { id:'rexRang', label:'Ranger', fixedName:'Rex Rang', color:'#6b8e23',
-    statWeights:{atk:4,spd:3.5,con:3,int:0.5,def:2,cha:1},
+    statWeights:{atk:4.5,spd:3,con:3,int:0.5,def:2,cha:1},
     abilities:['battlerang','emberang','whittle','swerve'], sprite:'ranger',
     stances: [
       { id:'patientKiller', name:'Patient Killer', desc:'ATK+2. Second hit of Battlerang/Emberang deals bonus damage.',
@@ -1320,7 +1320,7 @@ async function executeAbility(attacker, defender, ability) {
 
   // Swerve: no damage, just the dodge (already set up in executeTurn)
   if (ability.swerve) {
-    log(`${atkName} swerves${attacker.swerveActive === 'high' ? '! 70% dodge chance this turn' : ' again — only 15% dodge chance'}.`, 'status');
+    log(`${atkName} swerves${attacker.swerveActive === 'high' ? '! 100% evasion this turn' : ' again — only 20% evasion'}.`, 'status');
     updateHpBar(isPlayer ? 'player' : 'opponent');
     return;
   }
@@ -1345,7 +1345,7 @@ async function executeAbility(attacker, defender, ability) {
 
     // Swerve dodge check: defender dodges if swerving
     if (defender.swerveActive && !hitAbility.heal && !hitAbility.swerve && !hitAbility.grantWhittle) {
-      const dodgeChance = defender.swerveActive === 'high' ? 0.7 : 0.15;
+      const dodgeChance = defender.swerveActive === 'high' ? 1.0 : 0.2;
       if (Math.random() < dodgeChance) {
         atkSprite.classList.add('attacking'); await delay(150); atkSprite.classList.remove('attacking');
         log(`  ${label ? label + ': ' : ''}${defName} swerves out of the way!`, 'miss');

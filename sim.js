@@ -64,7 +64,7 @@ const CLASSES = [
       { id:'soulSnatcher', statBoosts:{int:3}, passive:'killHeal' },
     ]},
   { id:'rexRang', label:'Ranger',
-    statWeights:{atk:4,spd:3.5,con:3,int:0.5,def:2,cha:1},
+    statWeights:{atk:4.5,spd:3,con:3,int:0.5,def:2,cha:1},
     abilities:['battlerang','emberang','whittle','swerve'],
     stances: [
       { id:'patientKiller', statBoosts:{atk:2}, passive:'boomerangBonus' },
@@ -253,7 +253,7 @@ function simulateBattle(cls1, cls2) {
 
         // Swerve dodge check
         if (defender.swerveActive && !ability.heal && !ability.swerve && !ability.grantWhittle) {
-          const dodgeChance = defender.swerveActive === 'high' ? 0.7 : 0.15;
+          const dodgeChance = defender.swerveActive === 'high' ? 1.0 : 0.2;
           if (Math.random() < dodgeChance) continue;
         }
 
