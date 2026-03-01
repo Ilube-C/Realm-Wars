@@ -6,7 +6,7 @@ function gs(w){const s={};SN.forEach(n=>s[n]=5);let p=42;const tw=SN.reduce((a,n
 function chab(a,d2){return Math.max(0,(a-d2))*0.02}
 const AB={
   lichBlast:{t:'m',s:'int',f:8,dc:[2,6],u:14,fc:0.2},glaciate:{t:'m',s:'int',f:6,dc:[1,4],u:16,fc:0.6},
-  lichLifeDrain:{t:'s',s:'int',f:7,dc:[1,8],u:10,dr:0.5},shatter:{t:'s',s:'int',f:20,dc:[2,6],u:6,rqF:1},
+  lichLifeDrain:{t:'s',s:'int',f:7,dc:[1,8],u:10,dr:0.5},shatter:{t:'s',s:'int',f:18,dc:[2,6],u:6,rqF:1},
   tumpUp:{t:'p',s:'atk',f:4,dc:[1,6],u:16,dh:1},counterThrow:{t:'p',s:'atk',f:6,dc:[1,6],u:10,cm:1,cbo:0.75},
   subdue:{t:'p',s:'atk',f:11,dc:[1,6],u:12,sl:1},deathLust:{t:'p',s:'atk',f:6,dc:[1,4],u:4,gdl:1},
   radialStrike:{t:'p',s:'atk',f:8,dc:[1,6],u:16,bc:0.4},heavenlyBlow:{t:'p',s:'atk',f:7,dc:[1,8],u:10,sd:1},

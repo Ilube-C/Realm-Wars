@@ -405,7 +405,7 @@ const ABILITIES = {
   holyNova:     { name:'Holy Nova',       dmgType:'soul',     stat:'def', fixed:5,  dice:[2,6],  acc:0,  uses:6,  desc:'Explosion of sacred energy. High variance burst.' },
   moonfire:     { name:'Moonfire',        dmgType:'soul',     stat:'def', fixed:7,  dice:[1,8],  acc:0,  uses:16, desc:'Burn with moonlight. Moderate consistency.' },
   shadowBolt:   { name:'Shadow Bolt',     dmgType:'soul',     stat:'int', fixed:9,  dice:[1,4],  acc:1,  uses:20, desc:'Bolt of dark energy. Reliable curse damage.' },
-  lifeDrain:    { name:'Life Drain',      dmgType:'soul',     stat:'cha', fixed:5,  dice:[1,8],  acc:0,  uses:12, desc:'Siphon vitality. Lower damage but heals for half dealt.', drain:0.5 },
+  lifeDrain:    { name:'Life Drain',      dmgType:'soul',     stat:'cha', fixed:5,  dice:[1,8],  acc:0,  uses:12, desc:'Siphon vitality. Lower damage but heals for half dealt.', drain:0.4 },
   deathCoil:    { name:'Death Coil',      dmgType:'soul',     stat:'cha', fixed:5,  dice:[2,6],  acc:-1, uses:5,  desc:'Coil of death magic. High variance.' },
   hexBolt:      { name:'Hex Bolt',        dmgType:'soul',     stat:'cha', fixed:5,  dice:[1,6],  acc:0,  uses:15, desc:'Cursed projectile. Lower damage but may poison.', effect:'poison' },
   poisonBlade:  { name:'Poisoned Blade',  dmgType:'soul',     stat:'spd', fixed:5,  dice:[1,6],  acc:1,  uses:15, desc:'Envenomed weapon. Lower damage but may poison.', effect:'poison' },
@@ -423,8 +423,8 @@ const ABILITIES = {
   // LICH ABILITIES
   lichBlast:    { name:'Lich Blast',      dmgType:'magical',  stat:'int', fixed:8,  dice:[2,6],  acc:0,  uses:14, desc:'Concentrated necrotic-arcane blast. High damage with a chance to freeze.', freezeChance:0.2 },
   glaciate:     { name:'Glaciate',        dmgType:'magical',  stat:'int', fixed:6,  dice:[1,4],  acc:1,  uses:16, desc:'Wave of absolute cold. Low damage but very high freeze chance.', freezeChance:0.6 },
-  lichLifeDrain:{ name:'Life Drain',      dmgType:'magical',  stat:'int', fixed:7,  dice:[1,8],  acc:0,  uses:10, desc:'Siphon life force from the target. Heals proportion of damage dealt.', drain:0.5 },
-  shatter:      { name:'Shatter',         dmgType:'soul', stat:'int', fixed:20, dice:[2,6],  acc:1,  uses:6,  desc:'Shatter the frozen soul. High soul damage — bypasses all defences. ONLY works on frozen enemies.', requiresFrozen:true },
+  lichLifeDrain:{ name:'Life Drain',      dmgType:'magical',  stat:'int', fixed:7,  dice:[1,8],  acc:0,  uses:10, desc:'Siphon life force from the target. Heals proportion of damage dealt.', drain:0.4 },
+  shatter:      { name:'Shatter',         dmgType:'soul', stat:'int', fixed:18, dice:[2,6],  acc:1,  uses:6,  desc:'Shatter the frozen soul. High soul damage — bypasses all defences. ONLY works on frozen enemies.', requiresFrozen:true },
   // PIT DWELLER ABILITIES
   tumpUp:       { name:'Tump Up',        dmgType:'physical', stat:'atk', fixed:4,  dice:[1,6],  acc:1,  uses:16, desc:'Hits twice. Second hit deals more damage but can miss.', doubleHit:true },
   counterThrow: { name:'Counter Throw',  dmgType:'physical', stat:'atk', fixed:6,  dice:[1,6],  acc:0,  uses:10, desc:'Act with reduced speed. Deals 75% bonus damage if opponent already hit you this turn.', counterMove:true },
