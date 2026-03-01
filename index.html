@@ -987,11 +987,12 @@ function calcMoveStats(ability, attacker) {
   const variance = count * (sides * sides - 1) / 12;
   const stdDev = Math.sqrt(variance);
   const cv = avgBase > 0 ? stdDev / avgBase : 0;
-  let varLabel, varClass;
-  if (cv < 0.22) { varLabel = 'Low (Consistent)'; varClass = 'low'; }
-  else if (cv < 0.35) { varLabel = 'Medium (Moderate)'; varClass = 'med'; }
-  else if (cv < 0.48) { varLabel = 'High (Volatile)'; varClass = 'high'; }
-  else { varLabel = 'Extreme (Chaotic)'; varClass = 'extreme'; }
+  let varClass;
+  if (cv < 0.22) { varClass = 'low'; }
+  else if (cv < 0.35) { varClass = 'med'; }
+  else if (cv < 0.48) { varClass = 'high'; }
+  else { varClass = 'extreme'; }
+  const varLabel = `σ ${stdDev.toFixed(1)}`;
   return { minDmg, maxDmg, avgDmg: avgDmg.toFixed(1), varLabel, varClass, stdDev, atkStat, fixed };
 }
 
@@ -1027,7 +1028,7 @@ function showTooltip(btn, ability) {
       <div class="tt-stat"><span class="tt-stat-label">Uses</span><span class="tt-stat-val">${ability.currentUses} / ${ability.uses}</span></div>
       ${drainNote}${effectNote}${freezeNote}${frozenReq}
     </div>
-    ${ability.heal ? '' : `<div class="tt-variance ${s.varClass}">Variance: ${s.varLabel}</div>`}
+    ${ability.heal ? '' : `<div class="tt-variance ${s.varClass}">St.Dev: ${s.varLabel}</div>`}
     ${rangeHtml}
     ${effHtml}
     <div class="tt-desc">${ability.desc}</div>`;
