@@ -1091,20 +1091,25 @@ function applyStance(combatant, stance) {
       combatant.currentHp += diff;
     }
   }
+  // Check if enemy has Overwhelming stance (suppresses switch-in effects)
+  const isPlayerSwitching = playerTeam.includes(combatant);
+  const enemyActive = isPlayerSwitching ? opponent() : player();
+  const overwhelmed = enemyActive?.stance?.passive === 'overwhelming';
+
   // Flashy Arrival: apply 2 blind stacks to opponent on stance selection
   if (stance.passive === 'flashyBlind') {
-    const isPlayer = playerTeam.includes(combatant);
-    const target = isPlayer ? opponent() : player();
-    if (target && !target.fainted) {
+    const target = isPlayerSwitching ? opponent() : player();
+    if (target && !target.fainted && !overwhelmed) {
       target.blindStacks += 2;
       log(`Flashy Arrival! ${target.name} is blinded! (${target.blindStacks} stacks, ${target.blindStacks*15}% miss)`, 'status');
-      updateHpBar(!isPlayer ? 'player' : 'opponent');
+      updateHpBar(!isPlayerSwitching ? 'player' : 'opponent');
+    } else if (overwhelmed) {
+      log(`Flashy Arrival suppressed by ${enemyActive.name}'s Overwhelming presence!`, 'status');
     }
   }
   // Guerilla Fighter: throw a 30% power Battlerang on switch-in
-  if (stance.guerillaEntry) {
-    const isPlayer = playerTeam.includes(combatant);
-    const target = isPlayer ? opponent() : player();
+  if (stance.guerillaEntry && !overwhelmed) {
+    const target = isPlayerSwitching ? opponent() : player();
     if (target && !target.fainted) {
       const baseFixed = ABILITIES.battlerang.fixed;
       const entryFixed = Math.max(1, Math.floor(baseFixed * 0.3));
@@ -1135,10 +1140,12 @@ function applyStance(combatant, stance) {
     }
   }
   // Overgrowth: set vine terrain on switch-in
-  if (stance.overgrowthEntry) {
+  if (stance.overgrowthEntry && !overwhelmed) {
     terrain = { name: 'Overgrowth Vines', turnsLeft: 5, effect: 'vineSqueze' };
     log(`Overgrowth! Vines sprout across the battlefield! (5 turns)`, 'status');
     document.getElementById('terrain-display').innerHTML = '| 🌿 Overgrowth Vines (5t)';
+  } else if (stance.overgrowthEntry && overwhelmed) {
+    log(`Overgrowth suppressed by ${enemyActive.name}'s Overwhelming presence!`, 'status');
   }
 }
 
@@ -1372,7 +1379,7 @@ async function executeTurn(moveIdx) {
       // Pick and apply stance
       applyStance(newOpp, aiPickStance(newOpp));
       renderActiveInfo('opponent'); renderRoster('opponent');
-      if (newOpp.stance?.passive === 'flashyBlind') { p.blindStacks += 2; log(`Flashy Arrival! ${p.name} is blinded! (+2 stacks)`, 'status'); updateHpBar('player'); }
+      // Flashy Arrival handled by applyStance above (includes Overwhelming check)
       // Moonlight heal on switch-in
       applyMoonlightHeal(newOpp, oppTeam, 'opponent');
       // Player gets free attack
