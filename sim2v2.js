@@ -31,7 +31,7 @@ const ABILITIES = {
   makeWay:      { name:'Make Way',        dmgType:'physical', stat:'atk', fixed:5,  dice:[1,4],  uses:6,  makeWay:true },
   heavenlyBlow: { name:'Heavenly Blow',   dmgType:'physical', stat:'atk', fixed:8,  dice:[1,8],  uses:10, splitDamage:true },
   healingPrayer:{ name:'Healing Prayer',  dmgType:'heal',     stat:'cha', fixed:0,  dice:[1,1],  uses:4,  healingPrayer:true, heal:true },
-  battlerang:   { name:'Battlerang',      dmgType:'physical', stat:'atk', fixed:8,  dice:[1,6],  uses:14, boomerang:true },
+  battlerang:   { name:'Battlerang',      dmgType:'physical', stat:'atk', fixed:8,  dice:[1,6],  uses:14, boomerang:true, flinchChance:0.25 },
   emberang:     { name:'Emberang',        dmgType:'physical', stat:'atk', fixed:5,  dice:[1,6],  uses:12, boomerang:true, burnChance:0.35 },
   whittle:      { name:'Whittle',         dmgType:'physical', stat:'atk', fixed:4,  dice:[1,4],  uses:4,  grantWhittle:true },
   swerve:       { name:'Swerve',          dmgType:'physical', stat:'atk', fixed:0,  dice:[1,1],  uses:10, swerve:true },
@@ -65,7 +65,7 @@ function createCombatant(cls) {
     status: null, statusTurns: 0, fainted: false,
     switchLocked: false, deathLustTurns: 0, damagedThisTurn: false,
     blindStacks: 0, healingPrayerPending: false, makeWaySwitch: false, defBonusThisTurn: 0,
-    boomerangHits: [], burnStacks: 0, swerveActive: false, swerveLastTurn: false, whittleBoost: 0,
+    boomerangHits: [], burnStacks: 0, swerveActive: false, swerveLastTurn: false, whittleBoost: 0, flinched: false,
   };
 }
 
@@ -165,13 +165,17 @@ function executeHit(attacker, defender, ability) {
   }
   const restore = () => { if (stunDebuffs) for (const [s,v] of Object.entries(stunDebuffs)) attacker.stats[s] += v; };
 
-  if (attacker.status === 'frozen' && Math.random() < 0.66) { restore(); return; }
+  if (attacker.status === 'frozen' && !ability.healingPrayer && Math.random() < 0.66) { restore(); return; }
   if (attacker.blindStacks > 0 && Math.random() < attacker.blindStacks * 0.15) { attacker.blindStacks--; restore(); return; }
   if (ability.requiresFrozen && defender.status !== 'frozen') { restore(); return; }
 
   if (ability.grantWhittle) { attacker.whittleBoost += 4; attacker.stats.atk += 4; ability.currentUses--; restore(); return; }
   if (ability.swerve) { ability.currentUses--; restore(); return; }
-  if (ability.heal && ability.healingPrayer) { attacker.healingPrayerPending = true; ability.currentUses--; restore(); return; }
+  if (ability.heal && ability.healingPrayer) {
+    attacker.currentHp = Math.min(attacker.maxHp, attacker.currentHp + Math.max(5, Math.round(attacker.maxHp * 0.25)));
+    attacker.status = null; attacker.statusTurns = 0; attacker.blindStacks = 0; attacker.burnStacks = 0;
+    ability.currentUses--; restore(); return;
+  }
   if (ability.grantDeathLust) { attacker.deathLustTurns = 2; ability.currentUses--; restore(); return; }
 
   ability.currentUses--;
@@ -219,6 +223,12 @@ function executeHit(attacker, defender, ability) {
       defender.boomerangHits.push({ damage: Math.round(dmg * 1.0 * bm) });
     }
 
+    // Flinch (first hit only)
+    if (h === 0 && ability.flinchChance && defender.currentHp > 0 && !defender.flinched) {
+      const fc = ability.flinchChance + Math.max(0, (attacker.stats.cha - defender.stats.cha)) * 0.02;
+      if (Math.random() < fc) defender.flinched = true;
+    }
+
     // Kill heal
     // Attack lifesteal
     if (attacker.stance?.passive === 'attackLifesteal' && dmg > 0 && attacker.currentHp < attacker.maxHp) {
@@ -253,11 +263,7 @@ function tickStatus(b) {
   }
   if (b.status === 'stun') { b.status = null; b.statusTurns = 0; }
   if (b.defBonusThisTurn) { b.stats.def -= b.defBonusThisTurn; b.defBonusThisTurn = 0; }
-  if (b.healingPrayerPending && b.currentHp > 0) {
-    b.currentHp = Math.min(b.maxHp, b.currentHp + Math.round(b.maxHp * 0.25));
-    b.status = null; b.statusTurns = 0; b.blindStacks = 0; b.burnStacks = 0;
-    b.healingPrayerPending = false;
-  }
+  b.flinched = false;
 }
 
 function teamAlive(team) { return team.some(b => b.currentHp > 0 && !b.fainted); }
@@ -315,7 +321,9 @@ function simulate2v2(team1Classes, team2Classes) {
 
       const [first, second, fMove, sMove] = pInit >= oInit ? [pa, oa, pMove, oMove] : [oa, pa, oMove, pMove];
       executeHit(first, second, fMove);
-      if (second.currentHp > 0) executeHit(second, first, sMove);
+      if (second.currentHp > 0 && !second.flinched) executeHit(second, first, sMove);
+      first.flinched = false;
+      second.flinched = false;
     }
 
     // Tick all active

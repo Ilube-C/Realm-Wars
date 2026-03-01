@@ -421,9 +421,9 @@ const ABILITIES = {
   rejuvenation: { name:'Rejuvenation',   dmgType:'heal', stat:'def', fixed:9,  dice:[1,4],  acc:99, uses:5, desc:'Nature\'s restorative power. Very consistent.', heal:true },
   manaShield:   { name:'Mana Shield',    dmgType:'heal', stat:'int', fixed:7,  dice:[1,8],  acc:99, uses:4, desc:'Convert magical energy into healing.', heal:true },
   // LICH ABILITIES
-  lichBlast:    { name:'Lich Blast',      dmgType:'magical',  stat:'int', fixed:8,  dice:[2,6],  acc:0,  uses:14, desc:'Concentrated necrotic-arcane blast. High damage with a chance to freeze.', freezeChance:0.2 },
+  lichBlast:    { name:'Lich Blast',      dmgType:'magical',  stat:'int', fixed:7,  dice:[2,6],  acc:0,  uses:14, desc:'Concentrated necrotic-arcane blast. High damage with a chance to freeze.', freezeChance:0.2 },
   glaciate:     { name:'Glaciate',        dmgType:'magical',  stat:'int', fixed:5,  dice:[1,4],  acc:1,  uses:16, desc:'Wave of absolute cold. Low damage but very high freeze chance.', freezeChance:0.6 },
-  lichLifeDrain:{ name:'Life Drain',      dmgType:'magical',  stat:'int', fixed:7,  dice:[1,8],  acc:0,  uses:10, desc:'Siphon life force from the target. Heals proportion of damage dealt.', drain:0.5 },
+  lichLifeDrain:{ name:'Life Drain',      dmgType:'magical',  stat:'int', fixed:6,  dice:[1,8],  acc:0,  uses:10, desc:'Siphon life force from the target. Heals proportion of damage dealt.', drain:0.5 },
   shatter:      { name:'Shatter',         dmgType:'soul', stat:'int', fixed:18, dice:[2,6],  acc:1,  uses:6,  desc:'Shatter the frozen soul. High soul damage — bypasses all defences. ONLY works on frozen enemies.', requiresFrozen:true },
   // PIT DWELLER ABILITIES
   tumpUp:       { name:'Tump Up',        dmgType:'physical', stat:'atk', fixed:5,  dice:[1,6],  acc:1,  uses:16, desc:'Hits twice. Second hit deals more damage but can miss.', doubleHit:true },
@@ -1048,7 +1048,7 @@ async function startBattle() {
   document.getElementById('battle-num').textContent = battleNum;
 
   const level = Math.min(20, 5 + Math.floor(battleNum / 3));
-  const TESTING_1V1 = window.TESTING_1V1 = true; // Set to false to restore 4v4
+  const TESTING_1V1 = window.TESTING_1V1 = false; // Set to true for 1v1 testing
   const lichCls = CLASSES.find(c => c.id === 'lich');
   const pitDwellerCls = CLASSES.find(c => c.id === 'pitDweller');
   const sirShiningCls = CLASSES.find(c => c.id === 'sirShining');
