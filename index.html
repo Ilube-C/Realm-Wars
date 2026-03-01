@@ -446,9 +446,9 @@ const ABILITIES = {
   remedialOintment:{ name:'Remedial Ointment', dmgType:'heal', stat:'cha', fixed:0, dice:[1,1], acc:99, uses:6, desc:'Remove all poison from yourself and heal 5 HP per stack removed.', remedialOintment:true, heal:true },
   violentExtraction:{ name:'Violent Extraction', dmgType:'soul', stat:'atk', fixed:0, dice:[1,1], acc:99, uses:6, desc:'Rip all poison from the enemy. Deals 12 soul damage per stack removed.', violentExtraction:true },
   // VINY THE YOUNGER ABILITIES
-  petalStorm:   { name:'Petal Storm',    dmgType:'magical',  stat:'int', fixed:5,  dice:[1,4],  acc:0,  uses:14, desc:'Whirl of sharp petals. Small magic damage and applies 2 stacks of blind.', petalStorm:true },
+  petalStorm:   { name:'Petal Storm',    dmgType:'magical',  stat:'int', fixed:4,  dice:[1,4],  acc:0,  uses:14, desc:'Whirl of sharp petals. Small magic damage and applies a stack of blind.', petalStorm:true },
   battleBoar:   { name:'Battle Boar',    dmgType:'physical', stat:'int', fixed:0,  dice:[1,1],  acc:99, uses:2,  desc:'Summon a Battle Boar to replace you. The boar fights in your place but dies if switched out.', summonBoar:true },
-  ancientPower: { name:'Ancient Power',  dmgType:'magical',  stat:'int', fixed:18, dice:[2,6],  acc:0,  uses:6,  desc:'Channel ancient magic. Deals high magic damage at the end of 2 turns.', ancientPower:true },
+  ancientPower: { name:'Ancient Power',  dmgType:'magical',  stat:'int', fixed:14, dice:[2,6],  acc:0,  uses:6,  desc:'Channel ancient magic. Deals high magic damage at the end of 2 turns.', ancientPower:true },
   transference: { name:'Transference',   dmgType:'soul',     stat:'int', fixed:0,  dice:[1,1],  acc:99, uses:4,  desc:'Transfer all your status effects and stacks to the enemy. Ignores frozen inaction.', transference:true },
   // BATTLE BOAR ABILITIES
   headbutt:     { name:'Headbutt',       dmgType:'physical', stat:'atk', fixed:6,  dice:[1,4],  acc:0,  uses:20, desc:'Ram your head into the enemy. Low damage but 25% chance to flinch.', flinchChance:0.25 },
@@ -564,7 +564,7 @@ const CLASSES = [
         statBoosts:{spd:2}, passive:'neurotoxin' },
     ]},
   { id:'viny', label:'Druid', fixedName:'Viny the Younger', color:'#3a7a3a',
-    statWeights:{atk:0.5,spd:1,con:2.5,int:4,def:2.5,cha:2},
+    statWeights:{atk:0.5,spd:1,con:1,int:3.5,def:1.5,cha:2},
     abilities:['petalStorm','battleBoar','ancientPower','transference'], sprite:'druid',
     stances: [
       { id:'overgrowth', name:'Overgrowth', desc:'INT+2. On switch-in, adds Vine terrain for 5 turns. Vines squeeze the first mover each turn for fixed damage.',
@@ -1990,10 +1990,10 @@ async function executeAbility(attacker, defender, ability) {
       log(`  Duelist! ${atkName} gains +5 ATK (total +${attacker.duelistStacks} stacked)!`, 'status');
     }
 
-    // Petal Storm: apply 2 blind stacks on hit
+    // Petal Storm: apply 1 blind stack on hit
     if (hitAbility.petalStorm && dmg > 0 && !defender.fainted && defender.currentHp > 0) {
-      defender.blindStacks += 2;
-      log(`  Petals blind ${defName}! (${defender.blindStacks} stacks, ${defender.blindStacks*15}% miss)`, 'status');
+      defender.blindStacks += 1;
+      log(`  Petals blind ${defName}! (${defender.blindStacks} stack${defender.blindStacks>1?'s':''}, ${defender.blindStacks*15}% miss)`, 'status');
       updateHpBar(!isPlayer ? 'player' : 'opponent');
     }
 
