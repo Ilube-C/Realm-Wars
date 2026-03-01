@@ -441,10 +441,10 @@ const ABILITIES = {
   whittle:      { name:'Whittle',        dmgType:'physical', stat:'atk', fixed:4,  dice:[1,4],  acc:99, uses:4,  desc:'Sharpen your edge. Grants +4 ATK until you switch out.', grantWhittle:true },
   swerve:       { name:'Swerve',         dmgType:'physical', stat:'atk', fixed:0,  dice:[1,1],  acc:99, uses:10, desc:'Act fast and dodge. High chance to evade enemy attacks this turn. Much less effective if used consecutively.', swerve:true },
   // COUNT COCTION ABILITIES
-  poisonDart:   { name:'Poison Dart',    dmgType:'physical', stat:'atk', fixed:6,  dice:[1,6],  acc:0,  uses:14, desc:'Quick physical strike. Medium chance to add a stack of poison.', poisonChance:0.40 },
+  poisonDart:   { name:'Poison Dart',    dmgType:'physical', stat:'atk', fixed:8,  dice:[1,6],  acc:0,  uses:14, desc:'Quick physical strike. High chance to add a stack of poison.', poisonChance:0.60 },
   goblinGas:    { name:'Goblin Gas',     dmgType:'physical', stat:'atk', fixed:0,  dice:[1,1],  acc:99, uses:4,  desc:'Deploy a poison gas cloud. Both fighters gain a poison stack each turn for 5 turns. Replaces existing terrain.', goblinGas:true },
   remedialOintment:{ name:'Remedial Ointment', dmgType:'heal', stat:'cha', fixed:0, dice:[1,1], acc:99, uses:6, desc:'Remove all poison from yourself and heal 5 HP per stack removed.', remedialOintment:true, heal:true },
-  violentExtraction:{ name:'Violent Extraction', dmgType:'soul', stat:'atk', fixed:0, dice:[1,1], acc:99, uses:6, desc:'Rip all poison from the enemy. Deals 6 soul damage per stack removed.', violentExtraction:true },
+  violentExtraction:{ name:'Violent Extraction', dmgType:'soul', stat:'atk', fixed:0, dice:[1,1], acc:99, uses:6, desc:'Rip all poison from the enemy. Deals 10 soul damage per stack removed.', violentExtraction:true },
 };
 
 // ============================================================
@@ -542,7 +542,7 @@ const CLASSES = [
         statBoosts:{spd:2}, passive:'guerillaSwitchOut', guerillaEntry:true },
     ]},
   { id:'countCoction', label:'Rogue', fixedName:'Count Coction', color:'#5a8a3a',
-    statWeights:{atk:4,spd:5,con:1.5,int:0.5,def:1,cha:2},
+    statWeights:{atk:3,spd:4,con:3,int:0.5,def:2,cha:1.5},
     abilities:['poisonDart','goblinGas','remedialOintment','violentExtraction'], sprite:'rogue',
     stances: [
       { id:'rapidTransmission', name:'Rapid Transmission', desc:'CHA+2. When an enemy gains a poison stack, 30% chance (+CHA) they gain an extra one.',
@@ -791,7 +791,7 @@ function renderStatusEffects(b) {
   if (b.switchLocked) html += `<span class="status-effect-tag" style="background:#3a2a1a;color:#c86">📌 PINNED</span>`;
   if (b.healingPrayerPending) html += `<span class="status-effect-tag" style="background:#2a4a2a;color:#8c8">🙏 PRAYER PENDING</span>`;
   if (b.burnStacks > 0) html += `<span class="status-effect-tag" style="background:#4a2a0a;color:#f84">🔥 BURN ×${b.burnStacks}</span>`;
-  if (b.poisonStacks > 0) html += `<span class="status-effect-tag" style="background:#2a4a1a;color:#6a4">☠ POISON ×${b.poisonStacks} (${b.poisonStacks * 2}/turn)</span>`;
+  if (b.poisonStacks > 0) html += `<span class="status-effect-tag" style="background:#2a4a1a;color:#6a4">☠ POISON ×${b.poisonStacks} (${b.poisonStacks * 3}/turn)</span>`;
   if (b.boomerangHits.length > 0) html += `<span class="status-effect-tag" style="background:#3a3a1a;color:#cc8">🪃 RANG INCOMING (${b.boomerangHits.length})</span>`;
   if (b.flinched) html += `<span class="status-effect-tag" style="background:#4a3a1a;color:#ea8">😵 FLINCHED</span>`;
   if (b.swerveActive) html += `<span class="status-effect-tag" style="background:#1a3a2a;color:#8c8">💨 SWERVING</span>`;
@@ -1262,7 +1262,7 @@ async function executeTurn(moveIdx) {
             let stacks = 1;
             // Rapid Transmission: check if the ENEMY has this passive (since they're the poisoner)
             if (enemy.stance?.passive === 'rapidTransmission') {
-              const rtChance = 0.30 + (Math.max(0, (enemy.stats.cha - fighter.stats.cha)) * 0.02);
+              const rtChance = 0.30 * (1 + (enemy.stats.cha - fighter.stats.cha) * 0.02);
               if (Math.random() < rtChance) { stacks = 2; log(`  Rapid Transmission! Double poison on ${fighter.name}!`, 'status'); }
             }
             fighter.poisonStacks += stacks;
@@ -1434,7 +1434,7 @@ async function executeAbility(attacker, defender, ability) {
   if (ability.remedialOintment) {
     const stacks = attacker.poisonStacks;
     if (stacks > 0) {
-      const healAmt = stacks * 5;
+      const healAmt = stacks * 7;
       attacker.poisonStacks = 0;
       // Remove neurotoxin INT debuff
       if (defender.stance?.passive === 'neurotoxin') {
@@ -1455,7 +1455,7 @@ async function executeAbility(attacker, defender, ability) {
   if (ability.violentExtraction) {
     const stacks = defender.poisonStacks;
     if (stacks > 0) {
-      const dmg = stacks * 6;
+      const dmg = stacks * 10;
       defender.poisonStacks = 0;
       defender.currentHp = Math.max(0, defender.currentHp - dmg);
       defender.damagedThisTurn = true;
@@ -1600,7 +1600,7 @@ async function executeAbility(attacker, defender, ability) {
 
     // Dirty Boxing stance: chance to stun on dealing damage
     if (attacker.stance && attacker.stance.passive === 'stunOnHit' && !defender.status && !defender.fainted && defender.currentHp > 0) {
-      const stunChance = 0.3 + (Math.max(0, (attacker.stats.cha - defender.stats.cha)) * 0.02);
+      const stunChance = 0.3 * (1 + (attacker.stats.cha - defender.stats.cha) * 0.02);
       if (Math.random() < stunChance) {
         defender.status = 'stun'; defender.statusTurns = 1;
         log(`  Dirty Boxing! ${defName} is stunned!`, 'status');
@@ -1625,7 +1625,7 @@ async function executeAbility(attacker, defender, ability) {
     if (!defender.status && !defender.fainted && defender.currentHp > 0) {
       let freezeChance = hitAbility.freezeChance || 0;
       if (attacker.stance && attacker.stance.passive === 'freezeAll') freezeChance += 0.1;
-      freezeChance += (Math.max(0, (attacker.stats.cha - defender.stats.cha)) * 0.02); // CHA adds flat % bonus to freeze
+      freezeChance *= (1 + (attacker.stats.cha - defender.stats.cha) * 0.02); // CHA multiplicative scaling
       if (freezeChance > 0 && Math.random() < freezeChance) {
         defender.status = 'frozen'; defender.statusTurns = 99;
         log(`  ${defName} is frozen solid!`, 'status');
@@ -1635,7 +1635,7 @@ async function executeAbility(attacker, defender, ability) {
 
     // Blind application from Radial Strike
     if (hitAbility.blindChance && !defender.fainted && defender.currentHp > 0) {
-      if (Math.random() < hitAbility.blindChance + (Math.max(0, (attacker.stats.cha - defender.stats.cha)) * 0.02)) {
+      if (Math.random() < hitAbility.blindChance * (1 + (attacker.stats.cha - defender.stats.cha) * 0.02)) {
         defender.blindStacks++;
         log(`  ${defName} is blinded! (${defender.blindStacks} stack${defender.blindStacks>1?'s':''}, ${defender.blindStacks*15}% miss)`, 'status');
         updateHpBar(!isPlayer ? 'player' : 'opponent');
@@ -1644,7 +1644,7 @@ async function executeAbility(attacker, defender, ability) {
 
     // Battlefield Star: small chance to blind each hit
     if (attacker.stance && attacker.stance.passive === 'blindPerTurn' && !defender.fainted && defender.currentHp > 0) {
-      const bsBlindChance = 0.25 + (Math.max(0, (attacker.stats.cha - defender.stats.cha)) * 0.02);
+      const bsBlindChance = 0.25 * (1 + (attacker.stats.cha - defender.stats.cha) * 0.02);
       if (Math.random() < bsBlindChance) {
         defender.blindStacks++;
         log(`  Battlefield Star! ${defName} is dazzled! (${defender.blindStacks} blind stack${defender.blindStacks>1?'s':''})`, 'status');
@@ -1654,7 +1654,7 @@ async function executeAbility(attacker, defender, ability) {
 
     // Burn chance (Emberang)
     if (hitAbility.burnChance && !defender.fainted && defender.currentHp > 0) {
-      const bChance = hitAbility.burnChance + (Math.max(0, (attacker.stats.cha - defender.stats.cha)) * 0.02);
+      const bChance = hitAbility.burnChance * (1 + (attacker.stats.cha - defender.stats.cha) * 0.02);
       if (Math.random() < bChance) {
         defender.burnStacks++;
         log(`  ${defName} is burning! (${defender.burnStacks} stack${defender.burnStacks>1?'s':''})`, 'status');
@@ -1664,12 +1664,12 @@ async function executeAbility(attacker, defender, ability) {
 
     // Poison chance (Poison Dart)
     if (hitAbility.poisonChance && !defender.fainted && defender.currentHp > 0) {
-      const pChance = hitAbility.poisonChance + (Math.max(0, (attacker.stats.cha - defender.stats.cha)) * 0.02);
+      const pChance = hitAbility.poisonChance * (1 + (attacker.stats.cha - defender.stats.cha) * 0.02);
       if (Math.random() < pChance) {
         let stacks = 1;
         // Rapid Transmission: chance to double poison application
         if (attacker.stance?.passive === 'rapidTransmission') {
-          const rtChance = 0.30 + (Math.max(0, (attacker.stats.cha - defender.stats.cha)) * 0.02);
+          const rtChance = 0.30 * (1 + (attacker.stats.cha - defender.stats.cha) * 0.02);
           if (Math.random() < rtChance) { stacks = 2; log(`  Rapid Transmission! Double poison!`, 'status'); }
         }
         defender.poisonStacks += stacks;
@@ -1688,7 +1688,7 @@ async function executeAbility(attacker, defender, ability) {
 
     // Flinch: chance to make defender skip their action this turn (only on initial hit)
     if (hitAbility.flinchChance && !defender.fainted && defender.currentHp > 0 && !defender.flinched) {
-      const fChance = hitAbility.flinchChance + (Math.max(0, (attacker.stats.cha - defender.stats.cha)) * 0.02);
+      const fChance = hitAbility.flinchChance * (1 + (attacker.stats.cha - defender.stats.cha) * 0.02);
       if (Math.random() < fChance) {
         defender.flinched = true;
         log(`  ${defName} flinches! They lose their action this turn!`, 'status');
@@ -1785,7 +1785,7 @@ async function tickStatus(battler) {
 
   // Poison tick: fixed 2 damage per stack, stacks don't fall off
   if (battler.poisonStacks > 0 && !battler.fainted) {
-    const poisonDmg = battler.poisonStacks * 2;
+    const poisonDmg = battler.poisonStacks * 3;
     battler.currentHp = Math.max(0, battler.currentHp - poisonDmg);
     updateHpBar(isPlayer ? 'player' : 'opponent');
     showDmgFloat(isPlayer ? 'player' : 'opponent', poisonDmg, false);
