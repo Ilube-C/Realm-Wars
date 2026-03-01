@@ -445,6 +445,14 @@ const ABILITIES = {
   goblinGas:    { name:'Goblin Gas',     dmgType:'physical', stat:'atk', fixed:0,  dice:[1,1],  acc:99, uses:4,  desc:'Deploy a poison gas cloud. Both fighters gain a poison stack each turn for 5 turns. Replaces existing terrain.', goblinGas:true },
   remedialOintment:{ name:'Remedial Ointment', dmgType:'heal', stat:'cha', fixed:0, dice:[1,1], acc:99, uses:6, desc:'Remove all poison from yourself and heal 5 HP per stack removed.', remedialOintment:true, heal:true },
   violentExtraction:{ name:'Violent Extraction', dmgType:'soul', stat:'atk', fixed:0, dice:[1,1], acc:99, uses:6, desc:'Rip all poison from the enemy. Deals 12 soul damage per stack removed.', violentExtraction:true },
+  // VINY THE YOUNGER ABILITIES
+  petalStorm:   { name:'Petal Storm',    dmgType:'magical',  stat:'int', fixed:5,  dice:[1,4],  acc:0,  uses:14, desc:'Whirl of sharp petals. Small magic damage and applies 2 stacks of blind.', petalStorm:true },
+  battleBoar:   { name:'Battle Boar',    dmgType:'physical', stat:'int', fixed:0,  dice:[1,1],  acc:99, uses:2,  desc:'Summon a Battle Boar to replace you. The boar fights in your place but dies if switched out.', summonBoar:true },
+  ancientPower: { name:'Ancient Power',  dmgType:'magical',  stat:'int', fixed:18, dice:[2,6],  acc:0,  uses:6,  desc:'Channel ancient magic. Deals high magic damage at the end of 2 turns.', ancientPower:true },
+  transference: { name:'Transference',   dmgType:'soul',     stat:'int', fixed:0,  dice:[1,1],  acc:99, uses:4,  desc:'Transfer all your status effects and stacks to the enemy. Ignores frozen inaction.', transference:true },
+  // BATTLE BOAR ABILITIES
+  headbutt:     { name:'Headbutt',       dmgType:'physical', stat:'atk', fixed:6,  dice:[1,4],  acc:0,  uses:20, desc:'Ram your head into the enemy. Low damage but 25% chance to flinch.', flinchChance:0.25 },
+  chomp:        { name:'Chomp',          dmgType:'physical', stat:'atk', fixed:4,  dice:[1,4],  acc:0,  uses:20, desc:'Bite down hard. Low damage but applies a stack of Wounded.', chomp:true },
   // LEXILAS ABILITIES
   recklessSwing: { name:'Reckless Swing', dmgType:'physical', stat:'atk', fixed:16, dice:[2,6], acc:0, uses:10, desc:'Devastating overhead swing. Deals 10% of damage dealt as recoil to self.', recklessSwing:true },
   eviscerate:    { name:'Eviscerate',      dmgType:'physical', stat:'atk', fixed:8,  dice:[1,6], acc:0, uses:14, desc:'Slash deep. Medium physical damage. Applies a stack of Wounded (bonus soul damage after being hit, switching removes 1 stack).', eviscerate:true },
@@ -555,6 +563,22 @@ const CLASSES = [
       { id:'neurotoxin', name:'Neurotoxin', desc:'SPD+2. Poisoned enemies lose 1 INT per poison stack.',
         statBoosts:{spd:2}, passive:'neurotoxin' },
     ]},
+  { id:'viny', label:'Druid', fixedName:'Viny the Younger', color:'#3a7a3a',
+    statWeights:{atk:0.5,spd:1,con:2.5,int:4,def:2.5,cha:2},
+    abilities:['petalStorm','battleBoar','ancientPower','transference'], sprite:'druid',
+    stances: [
+      { id:'overgrowth', name:'Overgrowth', desc:'INT+2. On switch-in, adds Vine terrain for 5 turns. Vines squeeze the first mover each turn for fixed damage.',
+        statBoosts:{int:2}, passive:'overgrowth', overgrowthEntry:true },
+      { id:'restoration', name:'Restoration', desc:'CON+2. Heals 20% max HP upon switch-out.',
+        statBoosts:{con:2}, passive:'restoration' },
+    ]},
+  { id:'battleBoar', label:'Boar', fixedName:'Battle Boar', color:'#8a6633', isSummon:true,
+    stats:{atk:8,spd:12,con:8,int:5,def:6,cha:5},
+    abilities:['headbutt','chomp'], sprite:'barbarian',
+    stances: [
+      { id:'prickly', name:'Prickly', desc:'Enemies attacking you take 1 damage.',
+        statBoosts:{}, passive:'prickly' },
+    ]},
   { id:'lexilas', label:'Warrior', fixedName:'Lexilas', color:'#c4a035',
     statWeights:{atk:4,spd:2,con:3.5,int:0.5,def:3,cha:1},
     abilities:['recklessSwing','eviscerate','lexShieldBash','chivalry'], sprite:'warrior',
@@ -636,6 +660,7 @@ const SPRITES = {
   ranger:    ['...xxx....','..xxxxx...','..xxxxx...','...xxx....','..xxxx.x..','.xxxxx.x..','..xxxx.x..','...xxx....','..xx..xx..','..x....x..'],
   lich:      ['..x.xx.x..','...xxxx...','..xxxxxx..','..xxxxxx..','...xxxx...','.xxxxxxxx.','..xxxxxx..','..xxxxxx..','...x..x...','..xx..xx..'],
   warrior:   ['...xxxx...','..xxxxxx..','..xxxxxx..','...xxxx...','.xxxxxxxx.','xxxxxxxxxx','.xxxxxxxx.','..xxxxxx..','..xx..xx..','.xxx..xxx.'],
+  boar:      ['..........','..xxx.....','..xxxxx...','.xxxxxxx..','xxxxxxxxx.','xxxxxxxxxx','.xxxxxxxx.','..xxxxxx..','..xx..xx..','..xx..xx..'],
 };
 SPRITES.fighter = SPRITES.knight;
 
@@ -708,6 +733,8 @@ function createCombatant(cls, level) {
     boomerangHits: [], burnStacks: 0, swerveActive: false, swerveLastTurn: false, whittleBoost: 0, flinched: false, poisonStacks: 0,
     bladeTossCooldown: false, duelistStacks: 0, shieldBashActive: false, shieldBashDef: 0, shieldBashSpd: 0, woundedStacks: 0,
     justSwitchedIn: false, overwhelmSuppressed: false, chivalryPending: false,
+    ancientPowerPending: [], // [{turnsLeft, attacker(ref), target(ref)}]
+    isSummon: cls.isSummon || false, summonOwner: null, // for boar: who summoned it
   };
 }
 
@@ -1057,6 +1084,12 @@ function applyStance(combatant, stance) {
       }
     }
   }
+  // Overgrowth: set vine terrain on switch-in
+  if (stance.overgrowthEntry) {
+    terrain = { name: 'Overgrowth Vines', turnsLeft: 5, effect: 'vineSqueze' };
+    log(`Overgrowth! Vines sprout across the battlefield! (5 turns)`, 'status');
+    document.getElementById('terrain-display').innerHTML = '| 🌿 Overgrowth Vines (5t)';
+  }
 }
 
 function removeStance(combatant) {
@@ -1077,6 +1110,8 @@ let stanceModalOpen = false;
 function showStanceModal(combatant) {
   return new Promise(resolve => {
     if (stanceModalOpen) { resolve(aiPickStance(combatant)); return; }
+    // Auto-apply for single-stance characters (e.g. Battle Boar)
+    if (combatant.stances.length === 1) { resolve(combatant.stances[0]); return; }
     stanceModalOpen = true;
     const modal = document.getElementById('stance-modal');
     const box = document.getElementById('stance-box');
@@ -1108,20 +1143,23 @@ async function startBattle() {
   const rexRangCls = CLASSES.find(c => c.id === 'rexRang');
   const countCoctionCls = CLASSES.find(c => c.id === 'countCoction');
   const lexilasCls = CLASSES.find(c => c.id === 'lexilas');
+  const vinyCls = CLASSES.find(c => c.id === 'viny');
   if (TESTING_1V1) {
     // 1v1 test mode: random matchup from custom characters
-    const customs = [lichCls, pitDwellerCls, sirShiningCls, rexRangCls, countCoctionCls, lexilasCls];
+    const customs = [lichCls, pitDwellerCls, sirShiningCls, rexRangCls, countCoctionCls, lexilasCls, vinyCls];
     const shuffled = shuffle(customs);
     playerTeam = [createCombatant(shuffled[0], level)];
     oppTeam = [createCombatant(shuffled[1], level)];
   } else {
-    // 3v3 mode: pick from custom characters
-    const customs = shuffle([lichCls, pitDwellerCls, sirShiningCls, rexRangCls, countCoctionCls, lexilasCls]);
-    playerTeam = customs.slice(0, 3).map(c => createCombatant(c, level));
-    oppTeam = customs.slice(3, 6).map(c => createCombatant(c, level));
+    // Team mode: shuffle all custom characters, split into teams
+    const customs = shuffle([lichCls, pitDwellerCls, sirShiningCls, rexRangCls, countCoctionCls, lexilasCls, vinyCls]);
+    const teamSize = Math.floor(customs.length / 2); // 7→3v3 (one sits out), 8→4v4
+    playerTeam = customs.slice(0, teamSize).map(c => createCombatant(c, level));
+    oppTeam = customs.slice(teamSize, teamSize * 2).map(c => createCombatant(c, level));
   }
   playerActive = 0; oppActive = 0;
   terrain = null; // Reset terrain each battle
+  window.ancientPowerQueue = []; // Reset delayed damage queue
 
   // Apply stances for AI team members with stances
   oppTeam.forEach(b => { if (b.stances) { applyStance(b, aiPickStance(b)); } });
@@ -1156,6 +1194,12 @@ async function promptPlayerStance(combatant) {
 }
 
 function clearEffectsOnSwitchOut(unit) {
+  // Restoration: heal on switch-out (before removing stance)
+  if (unit.stance?.passive === 'restoration' && !unit.fainted && unit.currentHp > 0) {
+    const heal = Math.floor(unit.maxHp * 0.20);
+    unit.currentHp = Math.min(unit.maxHp, unit.currentHp + heal);
+    log(`Restoration! ${unit.name} heals ${heal} HP on withdrawal!`, 'heal');
+  }
   unit.deathLustTurns = 0;
   if (unit.whittleBoost) { unit.stats.atk -= unit.whittleBoost; unit.whittleBoost = 0; }
   if (unit.duelistStacks) { unit.stats.atk -= unit.duelistStacks; unit.duelistStacks = 0; }
@@ -1174,6 +1218,15 @@ async function doSwitch(newIdx) {
   isAnimating = true;
   try {
     const oldP = player();
+    // Summons die when switched out
+    if (oldP.isSummon) {
+      oldP.currentHp = 0; oldP.fainted = true;
+      log(`${oldP.name} is unsummoned and perishes!`, 'faint');
+      // Restore the owner to this slot
+      if (oldP.summonOwner) {
+        playerTeam[playerActive] = oldP.summonOwner;
+      }
+    }
     clearEffectsOnSwitchOut(oldP);
     playerActive = newIdx;
     // Always clear stance on the incoming character so they get a fresh pick
@@ -1329,9 +1382,54 @@ async function executeTurn(moveIdx) {
 
     // (Healing Prayer is now instant — no pending heal logic needed)
 
-    // Terrain tick: Goblin Gas applies poison to both active fighters
+    // Ancient Power: resolve delayed hits
+    if (window.ancientPowerQueue && window.ancientPowerQueue.length > 0) {
+      for (let i = window.ancientPowerQueue.length - 1; i >= 0; i--) {
+        const ap = window.ancientPowerQueue[i];
+        ap.turnsLeft--;
+        if (ap.turnsLeft <= 0) {
+          window.ancientPowerQueue.splice(i, 1);
+          const target = ap.defender;
+          const caster = ap.attacker;
+          if (!target.fainted && target.currentHp > 0 && !caster.fainted) {
+            const ability = ABILITIES.ancientPower;
+            const baseDmg = ability.fixed + rollDice(ability.dice[0], ability.dice[1]);
+            const atkRoll = rollDice(2, 6) + caster.stats.int;
+            const defRoll = rollDice(2, 6) + target.stats.int;
+            const mult = 0.5 + 0.5 * (atkRoll / Math.max(1, defRoll));
+            const dmg = Math.max(1, Math.round(baseDmg * mult));
+            target.currentHp = Math.max(0, target.currentHp - dmg);
+            target.damagedThisTurn = true;
+            const targetSide = playerTeam.includes(target) ? 'player' : 'opponent';
+            showDmgFloat(targetSide, dmg, dmg > 25, false);
+            log(`Ancient Power strikes ${target.name} for ${dmg} magic damage!`, 'damage');
+            updateHpBar(targetSide);
+            if (target.currentHp <= 0 && !target.fainted) { target.fainted = true; animateFaint(target); }
+          } else if (caster.fainted) {
+            log(`Ancient Power fizzles — ${caster.name} has fallen.`, 'info');
+          }
+        }
+      }
+      if (checkWin()) return;
+    }
+
+    // Terrain tick
     if (terrain && terrain.turnsLeft > 0) {
       terrain.turnsLeft--;
+      // Vine terrain: squeeze the first mover for fixed damage
+      if (terrain.effect === 'vineSqueze') {
+        const firstMover = first;
+        const firstSide = (first === p) ? 'player' : 'opponent';
+        if (!firstMover.fainted && firstMover.currentHp > 0) {
+          const vineDmg = 4;
+          firstMover.currentHp = Math.max(0, firstMover.currentHp - vineDmg);
+          firstMover.damagedThisTurn = true;
+          log(`Vines squeeze ${firstMover.name} for ${vineDmg} damage!`, 'damage');
+          showDmgFloat(firstSide, vineDmg, false, false);
+          updateHpBar(firstSide);
+          if (firstMover.currentHp <= 0 && !firstMover.fainted) { firstMover.fainted = true; animateFaint(firstMover); }
+        }
+      }
       if (terrain.effect === 'poisonBoth') {
         for (const fighter of [player(), opponent()]) {
           if (!fighter.fainted && fighter.currentHp > 0) {
@@ -1354,7 +1452,8 @@ async function executeTurn(moveIdx) {
         terrain = null;
         document.getElementById('terrain-display').innerHTML = '';
       } else {
-        document.getElementById('terrain-display').innerHTML = `| ☁️ ${terrain.name} (${terrain.turnsLeft}t)`;
+        const terrainIcon = terrain.effect === 'vineSqueze' ? '🌿' : '☁️';
+        document.getElementById('terrain-display').innerHTML = `| ${terrainIcon} ${terrain.name} (${terrain.turnsLeft}t)`;
       }
     }
 
@@ -1424,9 +1523,9 @@ async function executeAbility(attacker, defender, ability) {
     if (attacker.statusTurns <= 0) { attacker.status = null; }
   }
   if (attacker.status === 'frozen') {
-    // Healing Prayer bypasses frozen inaction
-    if (ability.healingPrayer) {
-      log(`${atkName} wills through the ice — in the ice, only God can hear you!`, 'status');
+    // Healing Prayer and Transference bypass frozen inaction
+    if (ability.healingPrayer || ability.transference) {
+      log(`${atkName} wills through the ice!`, 'status');
     } else {
       const roll = Math.random();
       if (roll < 0.333) {
@@ -1500,6 +1599,81 @@ async function executeAbility(attacker, defender, ability) {
     log(`${atkName} deploys Goblin Gas! Both fighters will gain poison each turn for 5 turns!`, 'status');
     document.getElementById('terrain-display').innerHTML = '| ☁️ Goblin Gas (5t)';
     updateHpBar('player'); updateHpBar('opponent');
+    return;
+  }
+
+  // Ancient Power: queue delayed magic damage (2 turns later)
+  if (ability.ancientPower) {
+    // Store pending ancient power hit
+    if (!window.ancientPowerQueue) window.ancientPowerQueue = [];
+    window.ancientPowerQueue.push({ turnsLeft: 2, attacker, defender, isPlayer });
+    log(`${atkName} channels Ancient Power... It will strike in 2 turns!`, 'status');
+    updateHpBar(isPlayer ? 'player' : 'opponent');
+    return;
+  }
+
+  // Transference: transfer all status effects to enemy (ignores frozen inaction)
+  if (ability.transference) {
+    let transferred = false;
+    // Transfer status (frozen/stun/poison)
+    if (attacker.status) {
+      defender.status = attacker.status;
+      defender.statusTurns = attacker.statusTurns;
+      attacker.status = null; attacker.statusTurns = 0;
+      log(`${atkName} transfers ${defender.status} to ${defName}!`, 'status');
+      transferred = true;
+    }
+    if (attacker.poisonStacks > 0) {
+      defender.poisonStacks += attacker.poisonStacks;
+      log(`${atkName} transfers ${attacker.poisonStacks} poison stacks to ${defName}! (${defender.poisonStacks} total)`, 'status');
+      attacker.poisonStacks = 0;
+      transferred = true;
+    }
+    if (attacker.burnStacks > 0) {
+      defender.burnStacks += attacker.burnStacks;
+      log(`${atkName} transfers ${attacker.burnStacks} burn stacks to ${defName}!`, 'status');
+      attacker.burnStacks = 0;
+      transferred = true;
+    }
+    if (attacker.blindStacks > 0) {
+      defender.blindStacks += attacker.blindStacks;
+      log(`${atkName} transfers ${attacker.blindStacks} blind stacks to ${defName}!`, 'status');
+      attacker.blindStacks = 0;
+      transferred = true;
+    }
+    if (attacker.woundedStacks > 0) {
+      defender.woundedStacks += attacker.woundedStacks;
+      log(`${atkName} transfers ${attacker.woundedStacks} wounded stacks to ${defName}!`, 'status');
+      attacker.woundedStacks = 0;
+      transferred = true;
+    }
+    if (!transferred) {
+      log(`${atkName} tries Transference, but has no status effects to transfer!`, 'info');
+    }
+    updateHpBar('player'); updateHpBar('opponent');
+    renderRoster('player'); renderRoster('opponent');
+    return;
+  }
+
+  // Battle Boar: summon a boar to replace Druid
+  if (ability.summonBoar) {
+    const boarCls = CLASSES.find(c => c.id === 'battleBoar');
+    const boar = createCombatant(boarCls, attacker.level);
+    boar.summonOwner = attacker;
+    boar.isSummon = true;
+    // Replace attacker in team with boar
+    const team = isPlayer ? playerTeam : oppTeam;
+    const activeIdx = isPlayer ? playerActive : oppActive;
+    clearEffectsOnSwitchOut(attacker);
+    team[activeIdx] = boar;
+    // Auto-apply Prickly stance
+    applyStance(boar, boar.stances[0]);
+    log(`${atkName} summons a Battle Boar and withdraws!`, 'switch');
+    log(`Battle Boar enters with Prickly stance! Enemies take 1 damage when attacking.`, 'info');
+    renderActiveInfo(isPlayer ? 'player' : 'opponent');
+    renderSprite(isPlayer ? 'player' : 'opponent');
+    renderRoster(isPlayer ? 'player' : 'opponent');
+    if (isPlayer) renderMoves();
     return;
   }
 
@@ -1774,8 +1948,8 @@ async function executeAbility(attacker, defender, ability) {
       }
     }
 
-    // Eviscerate: apply Wounded stack
-    if (hitAbility.eviscerate && !defender.fainted && defender.currentHp > 0) {
+    // Eviscerate / Chomp: apply Wounded stack
+    if ((hitAbility.eviscerate || hitAbility.chomp) && !defender.fainted && defender.currentHp > 0) {
       defender.woundedStacks++;
       log(`  ${defName} is wounded! (${defender.woundedStacks} stack${defender.woundedStacks>1?'s':''} — bonus soul damage on hit)`, 'status');
       updateHpBar(!isPlayer ? 'player' : 'opponent');
@@ -1814,6 +1988,20 @@ async function executeAbility(attacker, defender, ability) {
       attacker.duelistStacks += 5;
       attacker.stats.atk += 5;
       log(`  Duelist! ${atkName} gains +5 ATK (total +${attacker.duelistStacks} stacked)!`, 'status');
+    }
+
+    // Petal Storm: apply 2 blind stacks on hit
+    if (hitAbility.petalStorm && dmg > 0 && !defender.fainted && defender.currentHp > 0) {
+      defender.blindStacks += 2;
+      log(`  Petals blind ${defName}! (${defender.blindStacks} stacks, ${defender.blindStacks*15}% miss)`, 'status');
+      updateHpBar(!isPlayer ? 'player' : 'opponent');
+    }
+
+    // Prickly: attacker takes 1 damage when hitting a Prickly unit
+    if (defender.stance?.passive === 'prickly' && dmg > 0 && !hitAbility.heal && !attacker.fainted && attacker.currentHp > 0) {
+      attacker.currentHp = Math.max(1, attacker.currentHp - 1);
+      log(`  Prickly! ${atkName} takes 1 thorn damage from hitting ${defName}!`, 'damage');
+      updateHpBar(isPlayer ? 'player' : 'opponent');
     }
 
     return dmg;
@@ -1988,6 +2176,13 @@ async function handleFaint(who) {
 
   const deathLines = ['collapses!','crumples in defeat!','falls lifeless!','is vanquished!'];
   log(`${b.name} ${pick(deathLines)}`, 'faint');
+
+  // If a summon faints, restore the owner to that slot
+  if (b.isSummon && b.summonOwner) {
+    team[active] = b.summonOwner;
+    log(`${b.summonOwner.name} returns from the sidelines!`, 'switch');
+  }
+
   renderRoster(who);
 
   await delay(600);
@@ -2102,6 +2297,10 @@ function pickAIAbility() {
     else if (ab.goblinGas) { score = (!terrain ? 25 : 3) * (0.8 + Math.random() * 0.4); } // Deploy gas if no terrain
     else if (ab.violentExtraction) { score = (player().poisonStacks >= 4 ? player().poisonStacks * 8 : 2) * (0.8 + Math.random() * 0.4); } // Cash out at 4+ stacks
     else if (ab.remedialOintment) { return; } // Handled by heal check above
+    else if (ab.ancientPower) { score = 22 * (0.8 + Math.random() * 0.4); } // High delayed damage
+    else if (ab.transference) { score = ((o.poisonStacks + o.burnStacks + o.blindStacks + o.woundedStacks) * 6 + (o.status ? 15 : 0)) * (0.8 + Math.random() * 0.4); }
+    else if (ab.summonBoar) { score = (o.currentHp < o.maxHp * 0.4 ? 30 : 10) * (0.8 + Math.random() * 0.4); } // Summon when low HP to preserve Druid
+    else if (ab.chomp) { score = 10 * (0.8 + Math.random() * 0.4); }
     else {
       const avgDmg = (ab.fixed || 0) + ab.dice[0] * (ab.dice[1] + 1) / 2;
       score = avgDmg * (0.8 + Math.random() * 0.4);
@@ -2134,6 +2333,10 @@ function pickSmartMove() {
     else if (ab.goblinGas) { score = (!terrain ? 25 : 3) * (0.85 + Math.random() * 0.3); }
     else if (ab.violentExtraction) { score = (opponent().poisonStacks >= 4 ? opponent().poisonStacks * 8 : 2) * (0.85 + Math.random() * 0.3); }
     else if (ab.remedialOintment) { return; }
+    else if (ab.ancientPower) { score = 22 * (0.85 + Math.random() * 0.3); }
+    else if (ab.transference) { score = ((p.poisonStacks + p.burnStacks + p.blindStacks + p.woundedStacks) * 6 + (p.status ? 15 : 0)) * (0.85 + Math.random() * 0.3); }
+    else if (ab.summonBoar) { score = (p.currentHp < p.maxHp * 0.4 ? 30 : 10) * (0.85 + Math.random() * 0.3); }
+    else if (ab.chomp) { score = 10 * (0.85 + Math.random() * 0.3); }
     else {
       const avgDmg = (ab.fixed || 0) + ab.dice[0] * (ab.dice[1] + 1) / 2;
       score = avgDmg * (0.85 + Math.random() * 0.3);
