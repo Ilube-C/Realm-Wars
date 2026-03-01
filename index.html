@@ -445,6 +445,11 @@ const ABILITIES = {
   goblinGas:    { name:'Goblin Gas',     dmgType:'physical', stat:'atk', fixed:0,  dice:[1,1],  acc:99, uses:4,  desc:'Deploy a poison gas cloud. Both fighters gain a poison stack each turn for 5 turns. Replaces existing terrain.', goblinGas:true },
   remedialOintment:{ name:'Remedial Ointment', dmgType:'heal', stat:'cha', fixed:0, dice:[1,1], acc:99, uses:6, desc:'Remove all poison from yourself and heal 5 HP per stack removed.', remedialOintment:true, heal:true },
   violentExtraction:{ name:'Violent Extraction', dmgType:'soul', stat:'atk', fixed:0, dice:[1,1], acc:99, uses:6, desc:'Rip all poison from the enemy. Deals 10 soul damage per stack removed.', violentExtraction:true },
+  // LEXILAS ABILITIES
+  recklessSwing: { name:'Reckless Swing', dmgType:'physical', stat:'atk', fixed:14, dice:[2,6], acc:0, uses:10, desc:'Devastating overhead swing. Deals recoil damage to self based on ATK and DEF.', recklessSwing:true },
+  bladeToss:     { name:'Blade Toss',     dmgType:'physical', stat:'atk', fixed:7,  dice:[1,6], acc:0, uses:12, desc:'Throw blade with extra speed this turn. Medium damage. Can\'t use Reckless Swing or Blade Toss next turn.', bladeToss:true },
+  lexShieldBash: { name:'Shield Bash',    dmgType:'physical', stat:'atk', fixed:4,  dice:[1,4], acc:1, uses:16, desc:'Brace with your shield then strike. Gain DEF, lose SPD for the turn. Chance to stun.', shieldBash:true, stunChance:0.25 },
+  chivalry:      { name:'Chivalry',       dmgType:'heal',     stat:'def', fixed:0,  dice:[1,1], acc:99, uses:6, desc:'Honour the duel. Heals significant HP if the opponent switches this turn. Otherwise does nothing.', chivalry:true, heal:true },
 };
 
 // ============================================================
@@ -550,6 +555,15 @@ const CLASSES = [
       { id:'neurotoxin', name:'Neurotoxin', desc:'SPD+2. Poisoned enemies lose 1 INT per poison stack.',
         statBoosts:{spd:2}, passive:'neurotoxin' },
     ]},
+  { id:'lexilas', label:'Warrior', fixedName:'Lexilas', color:'#c4a035',
+    statWeights:{atk:4,spd:2,con:3.5,int:0.5,def:3,cha:1},
+    abilities:['recklessSwing','bladeToss','lexShieldBash','chivalry'], sprite:'warrior',
+    stances: [
+      { id:'overwhelming', name:'Overwhelming', desc:'ATK+3. Enemy stance passive is suppressed while Lexilas is active.',
+        statBoosts:{atk:3}, passive:'overwhelming' },
+      { id:'duelist', name:'Duelist', desc:'DEF+2. Gain +3 ATK on hit. Lasts until switch-out or next attack. Can stack.',
+        statBoosts:{def:2}, passive:'duelist' },
+    ]},
 ];
 
 // Generate default stances for classes that don't have them
@@ -621,6 +635,7 @@ const SPRITES = {
   monk:      ['....xx....','...xxxx...','...xxxx...','...xxxx...','..xxxxxx..','..xxxxxx..','..xxxxxx..','...xxxx...','..xx..xx..','..x....x..'],
   ranger:    ['...xxx....','..xxxxx...','..xxxxx...','...xxx....','..xxxx.x..','.xxxxx.x..','..xxxx.x..','...xxx....','..xx..xx..','..x....x..'],
   lich:      ['..x.xx.x..','...xxxx...','..xxxxxx..','..xxxxxx..','...xxxx...','.xxxxxxxx.','..xxxxxx..','..xxxxxx..','...x..x...','..xx..xx..'],
+  warrior:   ['...xxxx...','..xxxxxx..','..xxxxxx..','...xxxx...','.xxxxxxxx.','xxxxxxxxxx','.xxxxxxxx.','..xxxxxx..','..xx..xx..','.xxx..xxx.'],
 };
 SPRITES.fighter = SPRITES.knight;
 
@@ -691,6 +706,8 @@ function createCombatant(cls, level) {
     switchLocked: false, deathLustTurns: 0, damagedThisTurn: false,
     blindStacks: 0, healingPrayerPending: false, makeWaySwitch: false, defBonusThisTurn: 0,
     boomerangHits: [], burnStacks: 0, swerveActive: false, swerveLastTurn: false, whittleBoost: 0, flinched: false, poisonStacks: 0,
+    bladeTossCooldown: false, duelistStacks: 0, shieldBashActive: false, shieldBashDef: 0, shieldBashSpd: 0,
+    justSwitchedIn: false, overwhelmSuppressed: false,
   };
 }
 
@@ -967,7 +984,8 @@ function renderMoves() {
     let effHint = '';
     const scaleInfo = ab.heal ? ab.stat.toUpperCase() : (ab.dmgType === 'soul' ? '—' : ab.dmgType === 'physical' ? 'ATK' : 'INT');
     btn.innerHTML = `<span class="move-name">${ab.name}${effHint}</span><span class="move-info">${tag} | ${diceStr} | ${scaleInfo} | ${ab.currentUses}/${ab.uses}</span>`;
-    btn.disabled = ab.currentUses <= 0 || isAnimating || (ab.requiresFrozen && (!opponent() || opponent().status !== 'frozen'));
+    btn.disabled = ab.currentUses <= 0 || isAnimating || (ab.requiresFrozen && (!opponent() || opponent().status !== 'frozen'))
+      || (player().bladeTossCooldown && (ab.bladeToss || ab.recklessSwing));
     btn.onclick = () => executeTurn(i);
     btn.onmouseenter = () => showTooltip(btn, ab);
     btn.onmouseleave = hideTooltip;
@@ -1088,17 +1106,18 @@ async function startBattle() {
   const sirShiningCls = CLASSES.find(c => c.id === 'sirShining');
   const rexRangCls = CLASSES.find(c => c.id === 'rexRang');
   const countCoctionCls = CLASSES.find(c => c.id === 'countCoction');
+  const lexilasCls = CLASSES.find(c => c.id === 'lexilas');
   if (TESTING_1V1) {
     // 1v1 test mode: random matchup from custom characters
-    const customs = [lichCls, pitDwellerCls, sirShiningCls, rexRangCls, countCoctionCls];
+    const customs = [lichCls, pitDwellerCls, sirShiningCls, rexRangCls, countCoctionCls, lexilasCls];
     const shuffled = shuffle(customs);
     playerTeam = [createCombatant(shuffled[0], level)];
     oppTeam = [createCombatant(shuffled[1], level)];
   } else {
-    // 2v2 mode: pick from custom characters
-    const customs = shuffle([lichCls, pitDwellerCls, sirShiningCls, rexRangCls, countCoctionCls]);
-    playerTeam = customs.slice(0, 2).map(c => createCombatant(c, level));
-    oppTeam = customs.slice(2, 4).map(c => createCombatant(c, level));
+    // 3v3 mode: pick from custom characters
+    const customs = shuffle([lichCls, pitDwellerCls, sirShiningCls, rexRangCls, countCoctionCls, lexilasCls]);
+    playerTeam = customs.slice(0, 3).map(c => createCombatant(c, level));
+    oppTeam = customs.slice(3, 6).map(c => createCombatant(c, level));
   }
   playerActive = 0; oppActive = 0;
   terrain = null; // Reset terrain each battle
@@ -1146,11 +1165,14 @@ async function doSwitch(newIdx) {
     const oldP = player();
     oldP.deathLustTurns = 0; // Death Lust lost on switching
     if (oldP.whittleBoost) { oldP.stats.atk -= oldP.whittleBoost; oldP.whittleBoost = 0; } // Whittle lost on switching
+    if (oldP.duelistStacks) { oldP.stats.atk -= oldP.duelistStacks; oldP.duelistStacks = 0; } // Duelist lost on switching
     oldP.swerveActive = false; oldP.swerveLastTurn = false;
+    oldP.bladeTossCooldown = false;
     removeStance(oldP);
     playerActive = newIdx;
     // Always clear stance on the incoming character so they get a fresh pick
     removeStance(player());
+    player().justSwitchedIn = true;
     log(`${oldP.name} withdraws! ${player().name} the ${player().cls.label} enters the battle!`, 'switch');
     renderActiveInfo('player'); renderSprite('player'); renderRoster('player'); renderMoves();
 
@@ -1197,6 +1219,17 @@ async function executeTurn(moveIdx) {
     // Reset per-turn state
     p.damagedThisTurn = false;
     o.damagedThisTurn = false;
+    p.justSwitchedIn = false;
+    o.justSwitchedIn = false;
+
+    // Overwhelming stance: suppress enemy passive (store and null it)
+    let pSuppressedPassive = null, oSuppressedPassive = null;
+    if (p.stance?.passive === 'overwhelming' && o.stance) {
+      pSuppressedPassive = o.stance.passive; o.stance = {...o.stance, passive: null};
+    }
+    if (o.stance?.passive === 'overwhelming' && p.stance) {
+      oSuppressedPassive = p.stance.passive; p.stance = {...p.stance, passive: null};
+    }
 
     // Speed modifiers
     let pInit = getInitiative(p);
@@ -1207,6 +1240,12 @@ async function executeTurn(moveIdx) {
     if (oppAb.makeWay) oInit = Math.floor(oInit * 2.0);
     if (playerAb.swerve) pInit = Math.floor(pInit * 1.5); // Swerve: act fast
     if (oppAb.swerve) oInit = Math.floor(oInit * 1.5);
+    // Blade Toss: increased SPD this turn
+    if (playerAb.bladeToss) pInit = Math.floor(pInit * 1.5);
+    if (oppAb.bladeToss) oInit = Math.floor(oInit * 1.5);
+    // Shield Bash: +DEF, -SPD for the turn
+    if (playerAb.shieldBash) { p.shieldBashDef = 4; p.shieldBashSpd = Math.floor(p.stats.spd * 0.4); p.stats.def += 4; p.stats.spd -= p.shieldBashSpd; p.shieldBashActive = true; }
+    if (oppAb.shieldBash) { o.shieldBashDef = 4; o.shieldBashSpd = Math.floor(o.stats.spd * 0.4); o.stats.def += 4; o.stats.spd -= o.shieldBashSpd; o.shieldBashActive = true; }
     // Make Way: DEF bonus for this turn
     if (playerAb.makeWay) { p.defBonusThisTurn = 5; p.stats.def += 5; }
     if (oppAb.makeWay) { o.defBonusThisTurn = 5; o.stats.def += 5; }
@@ -1245,9 +1284,22 @@ async function executeTurn(moveIdx) {
 
     if (checkWin()) return;
 
+    // Restore suppressed passives
+    if (pSuppressedPassive && o.stance) o.stance = {...o.stance, passive: pSuppressedPassive};
+    if (oSuppressedPassive && p.stance) p.stance = {...p.stance, passive: oSuppressedPassive};
+
     // Restore Make Way DEF bonus
     if (p.defBonusThisTurn) { p.stats.def -= p.defBonusThisTurn; p.defBonusThisTurn = 0; }
     if (o.defBonusThisTurn) { o.stats.def -= o.defBonusThisTurn; o.defBonusThisTurn = 0; }
+    // Restore Shield Bash DEF/SPD
+    if (p.shieldBashActive) { p.stats.def -= p.shieldBashDef; p.stats.spd += p.shieldBashSpd; p.shieldBashActive = false; }
+    if (o.shieldBashActive) { o.stats.def -= o.shieldBashDef; o.stats.spd += o.shieldBashSpd; o.shieldBashActive = false; }
+    // Blade Toss cooldown: can't use Reckless Swing or Blade Toss next turn
+    for (const fighter of [p, o]) {
+      if (fighter.bladeTossCooldown) { fighter.bladeTossCooldown = false; } // clear last turn's cooldown
+    }
+    if (playerAb.bladeToss) p.bladeTossCooldown = true;
+    if (oppAb.bladeToss) o.bladeTossCooldown = true;
 
     // (Healing Prayer is now instant — no pending heal logic needed)
 
@@ -1319,6 +1371,7 @@ async function executeTurn(moveIdx) {
         removeStance(o);
         oppActive = oppTeam.indexOf(alive[0]);
         const next = opponent();
+        next.justSwitchedIn = true;
         if (next.stances) { applyStance(next, aiPickStance(next)); }
         log(`${next.name} the ${next.cls.label} enters the battle!`, 'switch');
         renderActiveInfo('opponent'); renderSprite('opponent'); renderRoster('opponent');
@@ -1467,6 +1520,21 @@ async function executeAbility(attacker, defender, ability) {
     } else {
       log(`${atkName} tries Violent Extraction, but ${defName} has no poison!`, 'miss');
     }
+    return;
+  }
+
+  // Chivalry: heals significant HP only if opponent switches this turn
+  if (ability.chivalry) {
+    if (defender.justSwitchedIn) {
+      const healAmt = Math.max(10, Math.round(attacker.maxHp * 0.35));
+      attacker.currentHp = Math.min(attacker.maxHp, attacker.currentHp + healAmt);
+      updateHpBar(isPlayer ? 'player' : 'opponent');
+      showDmgFloat(isPlayer ? 'player' : 'opponent', healAmt, false, true);
+      log(`${atkName} honours the duel! The opponent switched — healed ${healAmt} HP!`, 'heal');
+    } else {
+      log(`${atkName} waits with honour... but the opponent stands their ground. Nothing happens.`, 'info');
+    }
+    renderRoster(isPlayer ? 'player' : 'opponent');
     return;
   }
 
@@ -1695,6 +1763,32 @@ async function executeAbility(attacker, defender, ability) {
       }
     }
 
+    // Reckless Swing: recoil damage to self
+    if (hitAbility.recklessSwing && dmg > 0) {
+      const recoil = Math.max(1, Math.round(dmg * attacker.stats.atk / (attacker.stats.atk + attacker.stats.def)));
+      attacker.currentHp = Math.max(1, attacker.currentHp - recoil);
+      updateHpBar(isPlayer ? 'player' : 'opponent');
+      showDmgFloat(isPlayer ? 'player' : 'opponent', recoil, false, false);
+      log(`  Reckless recoil! ${atkName} takes ${recoil} self-damage!`, 'damage');
+    }
+
+    // Shield Bash: chance to stun
+    if (hitAbility.shieldBash && hitAbility.stunChance && !defender.status && !defender.fainted && defender.currentHp > 0) {
+      const sChance = hitAbility.stunChance + Math.max(0, (attacker.stats.cha - defender.stats.cha)) * 0.02;
+      if (Math.random() < sChance) {
+        defender.status = 'stun'; defender.statusTurns = 1;
+        log(`  Shield Bash! ${defName} is stunned!`, 'status');
+        updateHpBar(!isPlayer ? 'player' : 'opponent');
+      }
+    }
+
+    // Duelist stance: gain ATK on dealing damage (lost on next attack or switch)
+    if (attacker.stance?.passive === 'duelist' && dmg > 0 && !hitAbility.heal) {
+      attacker.duelistStacks += 3;
+      attacker.stats.atk += 3;
+      log(`  Duelist! ${atkName} gains +3 ATK (total +${attacker.duelistStacks} stacked)!`, 'status');
+    }
+
     return dmg;
   }
 
@@ -1713,6 +1807,13 @@ async function executeAbility(attacker, defender, ability) {
     }
   } else {
     await dealHit(ability);
+  }
+
+  // Duelist: consume ATK stacks after attacking (not heals/buffs)
+  if (attacker.duelistStacks > 0 && !ability.heal && !ability.chivalry && !ability.shieldBash) {
+    attacker.stats.atk -= attacker.duelistStacks;
+    log(`  Duelist stacks consumed! ${atkName} loses +${attacker.duelistStacks} ATK.`, 'info');
+    attacker.duelistStacks = 0;
   }
 
   if (defender.currentHp <= 0 && !defender.fainted) {
@@ -1880,6 +1981,7 @@ async function handleFaint(who) {
   if (who === 'player') playerActive = nextIdx;
   else oppActive = nextIdx;
   const next = who === 'player' ? player() : opponent();
+  next.justSwitchedIn = true;
   log(`${next.name} the ${next.cls.label} enters the fight!`, 'switch');
   renderActiveInfo(who); renderSprite(who); renderRoster(who);
 
@@ -1964,11 +2066,14 @@ function pickAIAbility() {
     if (ab.currentUses <= 0 || ab.heal) return;
     if (ab.requiresFrozen && player().status !== 'frozen') return;
     if (ab.grantWhittle && o.whittleBoost >= 8) return;
+    if (o.bladeTossCooldown && (ab.bladeToss || ab.recklessSwing)) return;
     let score;
-    if (ab.swerve) { score = (o.swerveLastTurn ? 5 : 20) * (0.8 + Math.random() * 0.4); }
+    if (ab.chivalry) { score = 8 * (0.8 + Math.random() * 0.4); } // Low priority unless predicting switch
+    else if (ab.shieldBash) { score = 12 * (0.8 + Math.random() * 0.4); }
+    else if (ab.swerve) { score = (o.swerveLastTurn ? 5 : 20) * (0.8 + Math.random() * 0.4); }
     else if (ab.grantWhittle) { score = (o.whittleBoost === 0 ? 25 : 15) * (0.8 + Math.random() * 0.4); }
     else if (ab.goblinGas) { score = (!terrain ? 25 : 3) * (0.8 + Math.random() * 0.4); } // Deploy gas if no terrain
-    else if (ab.violentExtraction) { score = (player().poisonStacks >= 4 ? player().poisonStacks * 8 : 2) * (0.8 + Math.random() * 0.4); } // Cash out at 3+ stacks
+    else if (ab.violentExtraction) { score = (player().poisonStacks >= 4 ? player().poisonStacks * 8 : 2) * (0.8 + Math.random() * 0.4); } // Cash out at 4+ stacks
     else if (ab.remedialOintment) { return; } // Handled by heal check above
     else {
       const avgDmg = (ab.fixed || 0) + ab.dice[0] * (ab.dice[1] + 1) / 2;
@@ -1993,8 +2098,11 @@ function pickSmartMove() {
     if (ab.currentUses <= 0 || ab.heal) return;
     if (ab.requiresFrozen && opponent().status !== 'frozen') return;
     if (ab.grantWhittle && p.whittleBoost >= 8) return;
+    if (p.bladeTossCooldown && (ab.bladeToss || ab.recklessSwing)) return;
     let score;
-    if (ab.swerve) { score = (p.swerveLastTurn ? 5 : 20) * (0.85 + Math.random() * 0.3); }
+    if (ab.chivalry) { score = 8 * (0.85 + Math.random() * 0.3); }
+    else if (ab.shieldBash) { score = 12 * (0.85 + Math.random() * 0.3); }
+    else if (ab.swerve) { score = (p.swerveLastTurn ? 5 : 20) * (0.85 + Math.random() * 0.3); }
     else if (ab.grantWhittle) { score = (p.whittleBoost === 0 ? 25 : 15) * (0.85 + Math.random() * 0.3); }
     else if (ab.goblinGas) { score = (!terrain ? 25 : 3) * (0.85 + Math.random() * 0.3); }
     else if (ab.violentExtraction) { score = (opponent().poisonStacks >= 4 ? opponent().poisonStacks * 8 : 2) * (0.85 + Math.random() * 0.3); }

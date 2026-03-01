@@ -46,7 +46,7 @@ function eh(a,d2,ab){
     if(d2.sa&&!ab.hl&&!ab.sw&&!ab.gw&&Math.random()<(d2.sa==='high'?1:0.2))continue;
     let dmg=cd(ab,a,d2);if(h>0&&ab.dh)dmg=Math.round(dmg*1.5);
     if(ab.cb&&a.dtt)dmg=Math.round(dmg*(1+ab.cb));
-    if(a.dlt>0&&!ab.hl&&!ab.gdl)dmg+=4;
+    if(a.dlt>0&&!ab.hl&&!ab.gdl)dmg+=3;
     d2.chp-=dmg;d2.dtt=true;
     if(a.stn?.p==='al'&&dmg>0)a.chp=Math.min(a.mhp,a.chp+Math.max(1,Math.floor(dmg*0.15)));
     if(d2.status==='f'&&!ab.rqF){d2.status=null;}
