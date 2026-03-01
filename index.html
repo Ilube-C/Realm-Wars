@@ -434,7 +434,7 @@ const ABILITIES = {
   radialStrike: { name:'Radial Strike',  dmgType:'physical', stat:'atk', fixed:9,  dice:[1,6],  acc:1,  uses:16, desc:'Sweeping holy blade strike. Chance to apply a stack of blind.', blindChance:0.4 },
   makeWay:      { name:'Make Way',       dmgType:'physical', stat:'atk', fixed:5,  dice:[1,4],  acc:99, uses:6,  desc:'Charge with massive speed boost and DEF bonus for the turn, then switch out at end of turn.', makeWay:true },
   heavenlyBlow: { name:'Heavenly Blow',  dmgType:'physical', stat:'atk', fixed:8,  dice:[1,8],  acc:0,  uses:10, desc:'Half physical, half magical damage. Hits both defences.', splitDamage:true },
-  healingPrayer:{ name:'Healing Prayer', dmgType:'heal',     stat:'cha', fixed:0,  dice:[1,1],  acc:99, uses:4,  desc:'Pray for healing. At end of NEXT turn, your active unit heals and is cured of all statuses.', healingPrayer:true, heal:true },
+  healingPrayer:{ name:'Healing Prayer', dmgType:'heal',     stat:'cha', fixed:0,  dice:[1,1],  acc:99, uses:4,  desc:'Pray for healing. Instantly heals 25% max HP and cures all statuses.', healingPrayer:true, heal:true },
   // REX RANG ABILITIES
   battlerang:   { name:'Battlerang',     dmgType:'physical', stat:'atk', fixed:8,  dice:[1,6],  acc:0,  uses:14, desc:'Medium physical damage. Boomerangs back — hits again at end of next turn. Chance to flinch (target loses action).', boomerang:true, flinchChance:0.25 },
   emberang:     { name:'Emberang',       dmgType:'physical', stat:'atk', fixed:5,  dice:[1,6],  acc:0,  uses:12, desc:'Less damage than Battlerang but chance to burn. Hits again at end of next turn.', boomerang:true, burnChance:0.35 },
@@ -1215,20 +1215,7 @@ async function executeTurn(moveIdx) {
     if (p.defBonusThisTurn) { p.stats.def -= p.defBonusThisTurn; p.defBonusThisTurn = 0; }
     if (o.defBonusThisTurn) { o.stats.def -= o.defBonusThisTurn; o.defBonusThisTurn = 0; }
 
-    // Healing Prayer: trigger pending heals
-    for (const b of [p, o]) {
-      if (b.healingPrayerPending && !b.fainted) {
-        const isP = playerTeam.includes(b);
-        const healAmt = Math.max(5, Math.floor(b.maxHp * 0.25));
-        b.currentHp = Math.min(b.maxHp, b.currentHp + healAmt);
-        b.status = null; b.statusTurns = 0; b.blindStacks = 0; // cure all
-        b.healingPrayerPending = false;
-        updateHpBar(isP ? 'player' : 'opponent');
-        showDmgFloat(isP ? 'player' : 'opponent', healAmt, false, true);
-        log(`${b.name}'s Healing Prayer activates! Healed ${healAmt} HP and cured all statuses!`, 'heal');
-        renderRoster(isP ? 'player' : 'opponent');
-      }
-    }
+    // (Healing Prayer is now instant — no pending heal logic needed)
 
     // Make Way: auto-switch at end of turn (only in 4v4)
     if (!p.fainted && playerAb.makeWay && playerTeam.length > 1) {
@@ -1325,10 +1312,13 @@ async function executeAbility(attacker, defender, ability) {
 
   if (ability.heal) {
     if (ability.healingPrayer) {
-      // Delayed heal: triggers at end of NEXT turn on whoever is active
-      attacker.healingPrayerPending = true;
-      log(`${atkName} begins a Healing Prayer! Healing will arrive at end of next turn.`, 'heal');
+      const healAmt = Math.max(5, Math.floor(attacker.maxHp * 0.25));
+      attacker.currentHp = Math.min(attacker.maxHp, attacker.currentHp + healAmt);
+      attacker.status = null; attacker.statusTurns = 0; attacker.blindStacks = 0; attacker.burnStacks = 0;
       updateHpBar(isPlayer ? 'player' : 'opponent');
+      showDmgFloat(isPlayer ? 'player' : 'opponent', healAmt, false, true);
+      log(`${atkName} uses Healing Prayer! Healed ${healAmt} HP and cured all statuses!`, 'heal');
+      renderRoster(isPlayer ? 'player' : 'opponent');
       return;
     }
     const heal = rollHealForAbility(attacker, ability);
