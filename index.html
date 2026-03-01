@@ -628,7 +628,10 @@ function rollHealForAbility(attacker, ability) {
 function rollDamageForAbility(attacker, defender, ability) {
   const [count, sides] = ability.dice;
   const baseDmg = rollDice(count, sides) + ability.bonus;
-  // Physical: ATK vs DEF, Magical (everything else): INT vs INT
+  // Physical: ATK vs DEF, Magical: INT vs INT, Soul: no scaling (raw dice only)
+  if (ability.dmgType === 'soul') {
+    return { damage: Math.max(1, baseDmg), baseDmg, atkRoll: 0, defRoll: 0, multiplier: 1.0 };
+  }
   let atkStat, defStat;
   if (ability.dmgType === 'physical') {
     atkStat = attacker.stats.atk;
@@ -644,7 +647,7 @@ function rollDamageForAbility(attacker, defender, ability) {
   return { damage, baseDmg, atkRoll, defRoll, multiplier };
 }
 
-function getInitiative(c) { const base = d(20) + mod(c.stats.spd); return c.status === 'frozen' ? Math.floor(base * 0.4) : base; }
+function getInitiative(c) { const base = rollDice(2, 8) + c.stats.spd; return c.status === 'frozen' ? Math.floor(base * 0.4) : base; }
 
 // ============================================================
 //  GAME STATE
@@ -820,7 +823,7 @@ function showTooltip(btn, ability) {
     <span class="tt-type ${ability.dmgType}">${typeIcon} ${typeLabel}</span>
     <div class="tt-stats">
       <div class="tt-stat"><span class="tt-stat-label">Dice</span><span class="tt-stat-val">${diceStr}</span></div>
-      <div class="tt-stat"><span class="tt-stat-label">${ability.heal ? 'Stat' : 'Scaling'}</span><span class="tt-stat-val">${ability.heal ? ability.stat.toUpperCase() : (ability.dmgType === 'physical' ? 'ATK vs DEF' : 'INT vs INT') + ' (' + (ability.dmgType === 'physical' ? 'ATK' : 'INT') + ': ' + s.atkStat + ')'}</span></div>
+      <div class="tt-stat"><span class="tt-stat-label">${ability.heal ? 'Stat' : 'Scaling'}</span><span class="tt-stat-val">${ability.heal ? ability.stat.toUpperCase() : ability.dmgType === 'soul' ? 'None (raw dice)' : (ability.dmgType === 'physical' ? 'ATK vs DEF' : 'INT vs INT') + ' (' + (ability.dmgType === 'physical' ? 'ATK' : 'INT') + ': ' + s.atkStat + ')'}</span></div>
       <div class="tt-stat"><span class="tt-stat-label">Uses</span><span class="tt-stat-val">${ability.currentUses} / ${ability.uses}</span></div>
       ${drainNote}${effectNote}${freezeNote}${frozenReq}
     </div>
@@ -856,7 +859,7 @@ function renderMoves() {
     const diceStr = `${ab.dice[0]}d${ab.dice[1]}${s.totalBonus>0?'+'+s.totalBonus:s.totalBonus<0?s.totalBonus:''}`;
     const tag = ab.heal ? 'HEAL' : ab.dmgType.toUpperCase();
     let effHint = '';
-    const scaleInfo = ab.heal ? ab.stat.toUpperCase() : (ab.dmgType === 'physical' ? 'ATK' : 'INT');
+    const scaleInfo = ab.heal ? ab.stat.toUpperCase() : (ab.dmgType === 'soul' ? '—' : ab.dmgType === 'physical' ? 'ATK' : 'INT');
     btn.innerHTML = `<span class="move-name">${ab.name}${effHint}</span><span class="move-info">${tag} | ${diceStr} | ${scaleInfo} | ${ab.currentUses}/${ab.uses}</span>`;
     btn.disabled = ab.currentUses <= 0 || isAnimating || (ab.requiresFrozen && (!opponent() || opponent().status !== 'frozen'));
     btn.onclick = () => executeTurn(i);
@@ -964,8 +967,8 @@ async function promptPlayerStance(combatant) {
   const stance = await showStanceModal(combatant);
   applyStance(combatant, stance);
   log(`${combatant.name} enters ${stance.name} stance! ${stance.desc}`, 'info');
-  renderActiveInfo('player'); renderRoster('player'); renderMoves();
   isAnimating = false;
+  renderActiveInfo('player'); renderRoster('player'); renderMoves();
 }
 
 async function doSwitch(newIdx) {
@@ -1103,9 +1106,13 @@ async function executeAbility(attacker, defender, ability) {
   const result = rollDamageForAbility(attacker, defender, ability);
   let dmg = result.damage;
 
-  const statLabel = ability.dmgType === 'physical' ? 'ATK' : 'INT';
-  const defLabel = ability.dmgType === 'physical' ? 'DEF' : 'INT';
-  log(`  Base: ${result.baseDmg}, Roll: 2d6+${statLabel}=${result.atkRoll} vs 2d6+${defLabel}=${result.defRoll} (×${result.multiplier.toFixed(2)})`, 'roll');
+  if (ability.dmgType === 'soul') {
+    log(`  Base: ${result.baseDmg} (soul — no scaling)`, 'roll');
+  } else {
+    const statLabel = ability.dmgType === 'physical' ? 'ATK' : 'INT';
+    const defLabel = ability.dmgType === 'physical' ? 'DEF' : 'INT';
+    log(`  Base: ${result.baseDmg}, Roll: 2d6+${statLabel}=${result.atkRoll} vs 2d6+${defLabel}=${result.defRoll} (×${result.multiplier.toFixed(2)})`, 'roll');
+  }
 
   // Frozen target takes reduced damage but thaws
   if (defender.status === 'frozen' && !ability.requiresFrozen) {
