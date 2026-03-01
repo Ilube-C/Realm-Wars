@@ -455,8 +455,8 @@ const ABILITIES = {
   chomp:        { name:'Chomp',          dmgType:'physical', stat:'atk', fixed:4,  dice:[1,4],  acc:0,  uses:20, desc:'Bite down hard. Low damage but applies a stack of Wounded.', chomp:true },
   // JAH APOSTLE ABILITIES
   moonlight:     { name:'Moonlight',       dmgType:'heal',     stat:'int', fixed:0,  dice:[1,1],  acc:99, uses:8,  desc:'Bathe your team in moonlight. Heals all teammates (including benched) for a small amount.', moonlight:true, heal:true },
-  readScripture: { name:'Read Scripture',  dmgType:'soul',     stat:'int', fixed:4,  dice:[1,4],  acc:0,  uses:14, desc:'Read from the forbidden text. Low soul damage. 30% chance to deal high soul damage instead.', readScripture:true },
-  inviteJudgement:{ name:'Invite Judgement', dmgType:'soul',   stat:'int', fixed:0,  dice:[1,1],  acc:99, uses:6,  desc:'The character with the highest HP% loses 15% of their max HP. Ignores defences.', inviteJudgement:true },
+  readScripture: { name:'Read Scripture',  dmgType:'soul',     stat:'int', fixed:6,  dice:[1,6],  acc:0,  uses:14, desc:'Read from the forbidden text. Low soul damage. 30% chance to deal high soul damage instead.', readScripture:true },
+  inviteJudgement:{ name:'Invite Judgement', dmgType:'soul',   stat:'int', fixed:0,  dice:[1,1],  acc:99, uses:6,  desc:'The enemy with the highest HP% loses 20% of their max HP. Ignores defences.', inviteJudgement:true },
   lookAtMe:      { name:'Look at Me',     dmgType:'soul',     stat:'cha', fixed:0,  dice:[1,1],  acc:99, uses:6,  desc:'Prevent the target from switching this turn. If they try, your team gains a 2-turn shield.', lookAtMe:true },
   // LEXILAS ABILITIES
   recklessSwing: { name:'Reckless Swing', dmgType:'physical', stat:'atk', fixed:16, dice:[2,6], acc:0, uses:10, desc:'Devastating overhead swing. Deals 10% of damage dealt as recoil to self.', recklessSwing:true },
@@ -1753,7 +1753,7 @@ async function executeAbility(attacker, defender, ability) {
   // Moonlight: heal all teammates including benched
   if (ability.moonlight) {
     const team = isPlayer ? playerTeam : oppTeam;
-    let baseHeal = Math.max(5, Math.floor(attacker.maxHp * 0.10));
+    let baseHeal = Math.max(5, Math.floor(attacker.maxHp * 0.15));
     // Gekyume's Blessing: boost healing by 30%
     if (attacker.stance?.passive === 'healBoost') baseHeal = Math.floor(baseHeal * 1.3);
     let totalHealed = 0;
@@ -1787,15 +1787,16 @@ async function executeAbility(attacker, defender, ability) {
 
   // Invite Judgement: highest HP% character loses 15% max HP
   if (ability.inviteJudgement) {
-    // Find character with highest HP% across both teams
-    const allFighters = [...playerTeam, ...oppTeam].filter(f => !f.fainted && f.currentHp > 0);
+    // Find enemy character with highest HP%
+    const enemyTeam = isPlayer ? oppTeam : playerTeam;
+    const allFighters = enemyTeam.filter(f => !f.fainted && f.currentHp > 0);
     let highest = null, highestPct = -1;
     for (const f of allFighters) {
       const pct = f.currentHp / f.maxHp;
       if (pct > highestPct) { highestPct = pct; highest = f; }
     }
     if (highest) {
-      let lossAmt = Math.max(1, Math.floor(highest.maxHp * 0.15));
+      let lossAmt = Math.max(1, Math.floor(highest.maxHp * 0.20));
       highest.currentHp = Math.max(1, highest.currentHp - lossAmt);
       highest.damagedThisTurn = true;
       const targetSide = playerTeam.includes(highest) ? 'player' : 'opponent';
@@ -1951,19 +1952,28 @@ async function executeAbility(attacker, defender, ability) {
       updateHpBar(!isPlayer ? 'player' : 'opponent');
     }
 
-    const isBigHit = result.multiplier >= 1.2;
+    // Crit: d100 + ATK > 100 = 1.5x damage
+    let isCrit = false;
+    if (dmg > 0 && !hitAbility.heal) {
+      const critRoll = Math.floor(Math.random() * 100) + 1 + attacker.stats.atk;
+      if (critRoll > 100) { dmg = Math.round(dmg * 1.5); isCrit = true; log(`  💥 CRITICAL HIT!`, 'damage'); }
+    }
 
-    // Shield absorption: block damage while shield is active
+    const isBigHit = result.multiplier >= 1.2 || isCrit;
+
+    // Shield: flat damage reduction per hit
     if (defender.shieldTurns > 0 && dmg > 0 && !hitAbility.heal) {
-      log(`  ${defName}'s shield absorbs the hit!`, 'status');
-      dmg = 0;
+      const shieldAmt = attacker.stance?.passive === 'healBoost' ? 10 : 8;
+      const reduced = Math.min(dmg, shieldAmt);
+      dmg = Math.max(0, dmg - shieldAmt);
+      log(`  ${defName}'s shield absorbs ${reduced} damage!`, 'status');
     }
 
     defender.currentHp = Math.max(0, defender.currentHp - dmg);
     defender.damagedThisTurn = true;
     updateHpBar(!isPlayer ? 'player' : 'opponent');
     showDmgFloat(!isPlayer ? 'player' : 'opponent', dmg, isBigHit, false);
-    log(`  ${defName} takes ${dmg} ${hitAbility.dmgType} damage!`, 'damage');
+    log(`  ${defName} takes ${dmg} ${hitAbility.dmgType} damage!${isCrit ? ' (CRIT)' : ''}`, 'damage');
     renderRoster(!isPlayer ? 'player' : 'opponent');
 
     // Soul Snatcher: lifesteal on attacks
@@ -2238,18 +2248,25 @@ async function tickStatus(battler) {
 
   // Curse tick: 35% chance per stack to transform into a random status
   if (battler.curseStacks > 0 && !battler.fainted) {
-    const possibleStatuses = [];
-    if (!battler.status) possibleStatuses.push('frozen', 'stun');
-    else if (battler.status === 'frozen') possibleStatuses.push('stun');
-    else if (battler.status === 'stun') possibleStatuses.push('frozen');
-    // Each stack has independent 35% chance
+    // Curse can transform into any status: frozen, stun (non-stacking, only if not already that status)
+    // or blind, burn, poison, wound (stacking, adds 1 stack)
     for (let i = 0; i < battler.curseStacks; i++) {
-      if (possibleStatuses.length > 0 && Math.random() < 0.35) {
-        const newStatus = possibleStatuses[Math.floor(Math.random() * possibleStatuses.length)];
-        battler.status = newStatus;
-        battler.statusTurns = newStatus === 'frozen' ? 3 : 1;
+      if (Math.random() < 0.35) {
+        const options = [];
+        // Non-stacking: only if target doesn't have it
+        if (battler.status !== 'frozen') options.push('frozen');
+        if (battler.status !== 'stun') options.push('stun');
+        // Stacking: always available
+        options.push('blind', 'burn', 'poison', 'wound');
+        const chosen = options[Math.floor(Math.random() * options.length)];
         battler.curseStacks--;
-        log(`${battler.name}'s curse manifests as ${newStatus.toUpperCase()}!`, 'status');
+        if (chosen === 'frozen') { battler.status = 'frozen'; battler.statusTurns = 3; }
+        else if (chosen === 'stun') { battler.status = 'stun'; battler.statusTurns = 1; }
+        else if (chosen === 'blind') { battler.blindStacks++; }
+        else if (chosen === 'burn') { battler.burnStacks++; }
+        else if (chosen === 'poison') { battler.poisonStacks++; }
+        else if (chosen === 'wound') { battler.woundedStacks++; }
+        log(`${battler.name}'s curse manifests as ${chosen.toUpperCase()}${['blind','burn','poison','wound'].includes(chosen) ? ' (+1 stack)' : ''}!`, 'status');
         updateHpBar(isPlayer ? 'player' : 'opponent');
         break; // Only one transformation per turn
       }

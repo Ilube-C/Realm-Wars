@@ -1,0 +1,237 @@
+'use strict';
+function d(n){return Math.floor(Math.random()*n)+1}
+function rollDice(c,s){let t=0;for(let i=0;i<c;i++)t+=d(s);return t}
+const SN=['atk','def','con','int','cha','spd'];
+function gs(w){const s={};SN.forEach(n=>s[n]=5);let p=42;const tw=SN.reduce((a,n)=>a+(w[n]||1),0);while(p>0){let r=Math.random()*tw;for(const n of SN){r-=(w[n]||1);if(r<=0){if(s[n]<20){s[n]++;p--}break}}}return s}
+function chab(a,d2){return Math.max(0,(a-d2))*0.02}
+const AB={
+  lichBlast:{t:'m',s:'int',f:7,dc:[2,6],u:14,fc:0.2},glaciate:{t:'m',s:'int',f:5,dc:[1,4],u:16,fc:0.6},
+  lichLifeDrain:{t:'s',s:'int',f:6,dc:[1,8],u:10,dr:0.5},shatter:{t:'s',s:'int',f:18,dc:[2,6],u:6,rqF:1},
+  tumpUp:{t:'p',s:'atk',f:5,dc:[1,6],u:16,dh:1},counterThrow:{t:'p',s:'atk',f:7,dc:[1,6],u:10,cm:1,cbo:0.75},
+  subdue:{t:'p',s:'atk',f:12,dc:[1,6],u:12,sl:1},deathLust:{t:'p',s:'atk',f:6,dc:[1,4],u:4,gdl:1},
+  radialStrike:{t:'p',s:'atk',f:9,dc:[1,6],u:16,bc:0.4},heavenlyBlow:{t:'p',s:'atk',f:8,dc:[1,8],u:10,sd:1},
+  healingPrayer:{t:'h',s:'cha',f:0,dc:[1,1],u:4,hp:1,hl:1},
+  battlerang:{t:'p',s:'atk',f:8,dc:[1,6],u:14,bm:1,fl:0.25},emberang:{t:'p',s:'atk',f:5,dc:[1,6],u:12,bm:1,bn:0.35},
+  whittle:{t:'p',s:'atk',f:4,dc:[1,4],u:4,gw:1},swerve:{t:'p',s:'atk',f:0,dc:[1,1],u:10,sw:1},
+  poisonDart:{t:'p',s:'atk',f:8,dc:[1,6],u:14,pc:0.60,pst:3},goblinGas:{t:'p',s:'atk',f:0,dc:[1,1],u:4,gg:1},
+  remedialOintment:{t:'h',s:'cha',f:0,dc:[1,1],u:6,ro:1,hl:1},violentExtraction:{t:'s',s:'atk',f:0,dc:[1,1],u:6,ve:1},
+  recklessSwing:{t:'p',s:'atk',f:16,dc:[2,6],u:10,rs:1},
+  eviscerate:{t:'p',s:'atk',f:8,dc:[1,6],u:14,ev:1},
+  lexShieldBash:{t:'p',s:'atk',f:7,dc:[1,4],u:16,sb:1,sc:0.35},
+  chivalry:{t:'h',s:'def',f:0,dc:[1,1],u:6,ch:1,hl:1},
+  // Druid
+  petalStorm:{t:'m',s:'int',f:4,dc:[1,4],u:14,pst2:1},
+  ancientPower:{t:'m',s:'int',f:14,dc:[2,6],u:6,ap:1},
+  transference:{t:'s',s:'int',f:0,dc:[1,1],u:4,tr:1},
+  battleBoar:{t:'p',s:'int',f:0,dc:[1,1],u:2,smn:1},
+  // Boar
+  headbutt:{t:'p',s:'atk',f:6,dc:[1,4],u:20,flc:0.25},
+  chomp:{t:'p',s:'atk',f:4,dc:[1,4],u:20,chm:1},
+  // Cleric
+  moonlight:{t:'h',s:'int',f:0,dc:[1,1],u:8,ml:1,hl:1},
+  readScripture:{t:'s',s:'int',f:4,dc:[1,4],u:14,rs2:1},
+  inviteJudgement:{t:'s',s:'int',f:0,dc:[1,1],u:6,ij:1},
+  lookAtMe:{t:'s',s:'cha',f:0,dc:[1,1],u:6,lam:1},
+};
+const CLS=[
+  {id:'P',l:'Paladin',sw:{atk:3,spd:1,con:3,int:1.5,def:4,cha:3.5},ab:['radialStrike','heavenlyBlow','healingPrayer','heavenlyBlow'],st:[{sb:{cha:2},p:'bpt'},{sb:{def:2},p:'fb'}]},
+  {id:'B',l:'Berserker',sw:{atk:4,spd:1.5,con:3,int:0.5,def:2,cha:1},ab:['tumpUp','counterThrow','subdue','deathLust'],st:[{sb:{con:2},p:'soh'},{sb:{def:2},p:'rt'}]},
+  {id:'M',l:'Mage',sw:{atk:0.5,spd:1.5,con:1.5,int:5,def:2.5,cha:3},ab:['lichBlast','glaciate','lichLifeDrain','shatter'],st:[{sb:{con:2,cha:2},p:'fa'},{sb:{int:3},p:'al'}]},
+  {id:'Ra',l:'Ranger',sw:{atk:4.5,spd:3,con:3,int:0.5,def:2,cha:1},ab:['battlerang','emberang','whittle','swerve'],st:[{sb:{atk:2},p:'bb'},{sb:{spd:2},p:'gs'}]},
+  {id:'Ro',l:'Rogue',sw:{atk:3,spd:4,con:3,int:0.5,def:2,cha:1.5},ab:['poisonDart','goblinGas','remedialOintment','violentExtraction'],st:[{sb:{cha:2},p:'rpt'},{sb:{spd:2},p:'nt'}]},
+  {id:'W',l:'Warrior',sw:{atk:4,spd:2,con:3.5,int:0.5,def:3,cha:1},ab:['recklessSwing','eviscerate','lexShieldBash','chivalry'],st:[{sb:{atk:3},p:'ov'},{sb:{def:2},p:'du'}]},
+  {id:'D',l:'Druid',sw:{atk:0.5,spd:1,con:1,int:3.5,def:1.5,cha:2},ab:['petalStorm','ancientPower','transference','battleBoar'],st:[{sb:{int:2},p:'og',ogE:1},{sb:{con:2},p:'rest'}]},
+  {id:'C',l:'Cleric',sw:{atk:0.5,spd:1,con:2,int:3.5,def:2,cha:3},ab:['moonlight','readScripture','inviteJudgement','lookAtMe'],st:[{sb:{int:2},p:'hb'},{sb:{cha:2},p:'cpt'}]},
+];
+const BOAR={stats:{atk:8,spd:12,con:8,int:5,def:6,cha:5},ab:['headbutt','chomp'],st:[{sb:{},p:'pk'}]};
+let terrain=null;
+function cr(cls){const stats=gs(cls.sw);const hp=20+stats.con*4;return{cls,nm:cls.l,stats,mhp:hp,chp:hp,ab:cls.ab.map(id=>{const a=AB[id];return{...a,id,cu:a.u}}),st:cls.st,stn:null,status:null,dlt:0,dtt:false,bs:0,brn:0,bh:[],sa:false,slt:false,wb:0,fl:false,ps:0,swl:false,ds:0,cp:false,ws:0,apq:[],cs:0,st2:0};}
+function apS(b,s){b.stn=s;if(s.sb)for(const[k,v]of Object.entries(s.sb))b.stats[k]+=v;}
+function gi(c){const b=rollDice(2,8)+c.stats.spd;if(c.status==='f')return Math.floor(b*0.4);if(c.status==='s')return Math.floor(b*0.5);return b;}
+function cd(ab,a,d2){const raw=ab.f+rollDice(ab.dc[0],ab.dc[1]);if(ab.t==='s')return raw;if(ab.hl)return 0;if(ab.sd){return Math.max(1,Math.round(raw/2*(0.5+0.5*(rollDice(2,6)+a.stats.atk)/(rollDice(2,6)+d2.stats.def))+raw/2*(0.5+0.5*(rollDice(2,6)+a.stats.int)/(rollDice(2,6)+d2.stats.int))));}const at=a.stats[ab.s]||a.stats.atk;const ds=ab.t==='p'?d2.stats.def:d2.stats.int;return Math.max(1,Math.round(raw*(0.5+0.5*(rollDice(2,6)+at)/(rollDice(2,6)+ds))));}
+function rS(b){return b.st[Math.floor(Math.random()*b.st.length)];}
+function aP(t,st,src){if(src.stn?.p==='rpt'&&Math.random()<0.30+chab(src.stats.cha,t.stats.cha))st+=1;t.ps+=st;}
+function am(a,d2){
+  if(a.chp<a.mhp*0.3){const hi=a.ab.findIndex(x=>x.hl&&!x.ch&&x.cu>0);if(hi>=0)return a.ab[hi];}
+  if(a.ps>=2&&a.chp<a.mhp*0.6){const ri=a.ab.findIndex(x=>x.ro&&x.cu>0);if(ri>=0)return a.ab[ri];}
+  const av=a.ab.filter(x=>{if(x.cu<=0)return false;if(x.rqF&&d2.status!=='f')return false;if(x.gw&&a.wb>=8)return false;if(x.ro)return false;return true;});
+  if(!av.length)return null;
+  const w2=av.map(x=>{if(x.hl&&!x.ch)return a.chp<a.mhp*0.5?30:5;if(x.ch)return a.chp<a.mhp*0.8?15:5;if(x.gdl)return a.dlt>0?0:15;if(x.sw)return a.slt?5:18;if(x.gw)return a.wb===0?22:12;if(x.gg)return!terrain?25:3;if(x.ve)return d2.ps>=4?d2.ps*8:2;if(x.sb)return 12;if(x.ev)return d2.ws<3?18:10;if(x.ap)return 22;if(x.tr)return(a.ps+a.brn+a.bs+a.ws)*6+(a.status?15:0);if(x.smn)return a.chp<a.mhp*0.4?30:10;if(x.chm)return 10;if(x.flc)return 12;if(x.rs2)return 12;if(x.ij)return 18;if(x.lam)return 10;if(x.ml)return a.chp<a.mhp*0.5?25:5;let avg=x.f+x.dc[0]*(x.dc[1]+1)/2;if(x.dh)avg*=1.8;if(x.cbo&&a.dtt)avg*=1.75;if(x.rqF)avg*=1.3;if(x.bm)avg*=1.4;return avg;});
+  const t2=w2.reduce((s2,v)=>s2+v,0);let r=Math.random()*t2;for(let i=0;i<av.length;i++){r-=w2[i];if(r<=0)return av[i];}return av[av.length-1];
+}
+function eh(a,d2,ab){
+  if(!ab||a.chp<=0||d2.chp<=0)return;
+  let suppressed=null;
+  if(a.stn?.p==='ov'&&d2.stn){suppressed=d2.stn.p;d2.stn={...d2.stn,p:null};}
+  let sd2=null;if(a.status==='s'){sd2={};for(const s2 of['spd','atk','int','cha']){const r=Math.floor(a.stats[s2]/2);a.stats[s2]-=r;sd2[s2]=r;}}
+  const rs2=()=>{if(sd2)for(const[s2,v]of Object.entries(sd2))a.stats[s2]+=v;if(suppressed&&d2.stn)d2.stn={...d2.stn,p:suppressed};};
+  if(a.status==='f'&&!ab.hp&&Math.random()<0.66){rs2();return;}
+  if(a.bs>0&&Math.random()<a.bs*0.15){a.bs--;rs2();return;}
+  if(ab.rqF&&d2.status!=='f'){rs2();return;}
+  if(ab.gw){a.wb+=4;a.stats.atk+=4;ab.cu--;rs2();return;}
+  if(ab.sw){ab.cu--;rs2();return;}
+  if(ab.hl&&ab.hp){a.chp=Math.min(a.mhp,a.chp+Math.max(5,Math.round(a.mhp*0.25)));a.status=null;a.bs=0;a.brn=0;a.ps=0;a.ws=0;ab.cu--;rs2();return;}
+  if(ab.gdl){a.dlt=2;ab.cu--;rs2();return;}
+  if(ab.gg){terrain={tl:5,e:'pb'};ab.cu--;rs2();return;}
+  if(ab.ro){const st=a.ps;if(st>0){a.ps=0;a.chp=Math.min(a.mhp,a.chp+st*7);}ab.cu--;rs2();return;}
+  if(ab.ve){const st=d2.ps;if(st>0){d2.ps=0;d2.chp-=st*12;d2.dtt=true;}ab.cu--;rs2();return;}
+  if(ab.ch){ab.cu--;a.cp=true;rs2();return;}
+  if(ab.ap){if(!a.apq)a.apq=[];a.apq.push({tl:2,tgt:d2});ab.cu--;rs2();return;}
+  if(ab.tr){
+    if(a.status){d2.status=a.status;a.status=null;}
+    if(a.ps>0){d2.ps+=a.ps;a.ps=0;}
+    if(a.brn>0){d2.brn+=a.brn;a.brn=0;}
+    if(a.bs>0){d2.bs+=a.bs;a.bs=0;}
+    if(a.ws>0){d2.ws+=a.ws;a.ws=0;}
+    ab.cu--;rs2();return;
+  }
+  if(ab.smn){ab.cu--;a._summon=true;rs2();return;}
+  if(ab.ml){const heal=Math.max(5,Math.floor(a.mhp*0.10))*(a.stn?.p==='hb'?1.3:1);a.chp=Math.min(a.mhp,a.chp+Math.floor(heal));ab.cu--;rs2();return;}
+  if(ab.ij){
+    // In 1v1: target highest HP% between a and d2
+    const tgt=(a.chp/a.mhp)>(d2.chp/d2.mhp)?a:d2;
+    const loss=Math.max(1,Math.floor(tgt.mhp*0.15));
+    tgt.chp=Math.max(1,tgt.chp-loss);tgt.dtt=true;
+    ab.cu--;rs2();return;
+  }
+  if(ab.lam){d2.swl=true;ab.cu--;rs2();return;} // switch lock for turn
+  // Read Scripture: 30% chance high damage
+  if(ab.rs2&&Math.random()<0.30){ab={...ab,f:14,dc:[2,6]};}
+  let sbDef=0,sbSpd=0;
+  if(ab.sb){sbDef=4;sbSpd=Math.floor(a.stats.spd*0.4);a.stats.def+=sbDef;a.stats.spd-=sbSpd;}
+  ab.cu--;
+  for(let h=0;h<(ab.dh?2:1);h++){
+    if(d2.chp<=0)break;if(h>0&&ab.dh&&Math.random()<0.3)continue;
+    if(d2.sa&&Math.random()<(d2.sa==='high'?1:0.2))continue;
+    let dmg=cd(ab,a,d2);
+    if(d2.shieldTurns>0&&!ab.hl){dmg=0;} // Shield absorbs
+    if(h>0&&ab.dh)dmg=Math.round(dmg*1.5);
+    if(ab.cbo&&a.dtt)dmg=Math.round(dmg*(1+ab.cbo));
+    if(a.dlt>0&&!ab.hl&&!ab.gdl)dmg+=4;
+    // Eviscerate: apply wounded
+    if(ab.ev&&d2.chp>0)d2.ws++;
+    // Wounded: bonus soul damage after being hit
+    if(d2.ws>0&&dmg>0)dmg+=d2.ws*2;
+    d2.chp-=dmg;d2.dtt=true;
+    if(ab.rs&&dmg>0){const recoil=Math.max(1,Math.round(dmg*0.10));a.chp=Math.max(1,a.chp-recoil);}
+    if(a.stn?.p==='al'&&dmg>0)a.chp=Math.min(a.mhp,a.chp+Math.max(1,Math.floor(dmg*0.15)));
+    if(d2.status==='f'&&!ab.rqF){d2.status=null;}
+    if(ab.rqF&&d2.status==='f'){d2.status=null;}
+    if(ab.dr)a.chp=Math.min(a.mhp,a.chp+Math.round(dmg*ab.dr));
+    if(ab.sl)d2.swl=true;
+    if(a.stn?.p==='soh'&&!d2.status&&d2.chp>0&&Math.random()<0.3+chab(a.stats.cha,d2.stats.cha)){d2.status='s';}
+    if(!d2.status&&d2.chp>0){let fc=ab.fc||0;if(a.stn?.p==='fa')fc+=0.1;fc+=chab(a.stats.cha,d2.stats.cha);if(fc>0&&Math.random()<fc){d2.status='f';}}
+    if(ab.bc&&d2.chp>0&&Math.random()<ab.bc+chab(a.stats.cha,d2.stats.cha))d2.bs++;
+    if(a.stn?.p==='bpt'&&d2.chp>0&&Math.random()<0.25+chab(a.stats.cha,d2.stats.cha))d2.bs++;
+    if(ab.bn&&d2.chp>0&&Math.random()<ab.bn+chab(a.stats.cha,d2.stats.cha))d2.brn++;
+    if(ab.pc&&d2.chp>0&&Math.random()<ab.pc+chab(a.stats.cha,d2.stats.cha))aP(d2,ab.pst||1,a);
+    if(ab.bm&&d2.chp>0){d2.bh.push({dm:Math.round(dmg*(a.stn?.p==='bb'?1.3:1.0))});}
+    if(h===0&&ab.fl&&d2.chp>0&&!d2.fl&&Math.random()<ab.fl+chab(a.stats.cha,d2.stats.cha))d2.fl=true;
+    if(ab.flc&&d2.chp>0&&!d2.fl&&Math.random()<ab.flc+chab(a.stats.cha,d2.stats.cha))d2.fl=true;
+    if(ab.chm&&d2.chp>0)d2.ws++;
+    if(ab.pst2&&dmg>0&&d2.chp>0&&Math.random()<0.50+chab(a.stats.cha,d2.stats.cha))d2.bs+=1;
+    if(d2.stn?.p==='pk'&&dmg>0&&a.chp>0)a.chp=Math.max(1,a.chp-1);
+    if(ab.sb&&ab.sc&&!d2.status&&d2.chp>0&&Math.random()<ab.sc+chab(a.stats.cha,d2.stats.cha)){d2.status='s';}
+    if(a.stn?.p==='du'&&dmg>0){a.ds+=5;a.stats.atk+=5;}
+  }
+  if(a.ds>0&&!ab.ch){a.stats.atk-=a.ds;a.ds=0;}
+  if(ab.sb){a.stats.def-=sbDef;a.stats.spd+=sbSpd;}
+  rs2();
+}
+function tk(b,enemy){
+  if(b.stn?.p==='rt'&&b.chp>0&&b.chp<b.mhp)b.chp=Math.min(b.mhp,b.chp+Math.max(1,Math.floor(b.mhp*0.05)));
+  if(b.dlt>0)b.dlt--;b.swl=false;b.slt=!!b.sa;b.sa=false;b.fl=false;
+  if(b.st2>0){b.st2--;} // shield decrement
+  // Curse tick
+  if(b.cs>0&&b.chp>0){
+    for(let i=0;i<b.cs;i++){
+      if(Math.random()<0.35){
+        const opts=[];if(!b.status)opts.push('f','s');else if(b.status==='f')opts.push('s');else if(b.status==='s')opts.push('f');
+        if(opts.length){b.status=opts[Math.floor(Math.random()*opts.length)];b.cs--;break;}
+      }
+    }
+  }
+  // Forbidden Sermon: curse per turn
+  if(b.stn?.p==='cpt'&&b.chp>0&&enemy&&enemy.chp>0){enemy.cs++;}
+  if(b.brn>0&&b.chp>0){b.chp=Math.max(0,b.chp-Math.max(1,Math.floor(b.mhp*0.04*b.brn)));if(Math.random()<0.5)b.brn--;}
+  if(b.ps>0&&b.chp>0){b.chp=Math.max(0,b.chp-b.ps*2);}
+  if(b.bh.length>0&&b.chp>0){for(const h of b.bh.splice(0)){b.chp=Math.max(0,b.chp-h.dm);if(b.chp<=0)break;}}
+  if(b.status==='s'){b.status=null;}
+}
+function mkBoar(){
+  const hp=20+BOAR.stats.con*4;
+  return{cls:BOAR,nm:'Boar',stats:{...BOAR.stats},mhp:hp,chp:hp,ab:BOAR.ab.map(id=>{const a2=AB[id];return{...a2,id,cu:a2.u}}),st:BOAR.st,stn:null,status:null,dlt:0,dtt:false,bs:0,brn:0,bh:[],sa:false,slt:false,wb:0,fl:false,ps:0,swl:false,ds:0,cp:false,ws:0,apq:[]};
+}
+function sim(c1,c2){
+  terrain=null;
+  let a=cr(c1),b=cr(c2);
+  let aOwner=null,bOwner=null; // original unit when summon is active
+  apS(a,rS(a));apS(b,rS(b));
+  if(a.stn.p==='fb')b.bs+=2;if(b.stn.p==='fb')a.bs+=2;
+  if(a.stn?.ogE)terrain={tl:5,e:'vine'};
+  if(b.stn?.ogE)terrain={tl:5,e:'vine'};
+  for(let t=0;t<100;t++){
+    a.dtt=false;b.dtt=false;a.cp=false;b.cp=false;
+    a._summon=false;b._summon=false;
+    const a2=am(a,b),b2=am(b,a);if(!a2&&!b2)break;
+    let ai=gi(a),bi=gi(b);
+    if(a2?.cm)ai=Math.floor(ai*0.5);if(b2?.cm)bi=Math.floor(bi*0.5);
+    if(a2?.sw){ai=Math.floor(ai*1.5);a.sa=!a.slt?'high':'low';}
+    if(b2?.sw){bi=Math.floor(bi*1.5);b.sa=!b.slt?'high':'low';}
+    if(a2?.ch)ai=-100;if(b2?.ch)bi=-100;
+    const[f,s,fm,sm]=ai>=bi?[a,b,a2,b2]:[b,a,b2,a2];
+    eh(f,s,fm);if(s.chp>0&&!s.fl)eh(s,f,sm);f.fl=false;s.fl=false;
+    // Handle summons after combat
+    if(a._summon){aOwner=a;a=mkBoar();apS(a,a.st[0]);}
+    if(b._summon){bOwner=b;b=mkBoar();apS(b,b.st[0]);}
+    if(a.cp&&!a.dtt){a.chp=Math.min(a.mhp,a.chp+Math.max(10,Math.round(a.mhp*0.30)));}
+    if(b.cp&&!b.dtt){b.chp=Math.min(b.mhp,b.chp+Math.max(10,Math.round(b.mhp*0.30)));}
+    // Ancient Power resolve
+    for(const fighter of[a,b,aOwner,bOwner]){
+      if(!fighter||!fighter.apq)continue;
+      for(let i=fighter.apq.length-1;i>=0;i--){
+        fighter.apq[i].tl--;
+        if(fighter.apq[i].tl<=0){
+          const ap=fighter.apq.splice(i,1)[0];
+          if(ap.tgt.chp>0&&!fighter.chp<=0){
+            const raw=18+rollDice(2,6);const am2=0.5+0.5*(rollDice(2,6)+fighter.stats.int)/(rollDice(2,6)+ap.tgt.stats.int);
+            ap.tgt.chp-=Math.max(1,Math.round(raw*am2));ap.tgt.dtt=true;
+          }
+        }
+      }
+    }
+    // Terrain
+    if(terrain&&terrain.tl>0){
+      terrain.tl--;
+      if(terrain.e==='pb'){for(const x of[a,b]){if(x.chp>0)aP(x,1,x===a?b:a);}}
+      if(terrain.e==='vine'){const fm2=ai>=bi?a:b;if(fm2.chp>0){fm2.chp-=4;fm2.dtt=true;}}
+      if(terrain.tl<=0)terrain=null;
+    }
+    tk(a,b);tk(b,a);
+    // If boar dies, restore owner
+    if(aOwner&&a.chp<=0){a=aOwner;aOwner=null;}
+    if(bOwner&&b.chp<=0){b=bOwner;bOwner=null;}
+    // Win check (original owners)
+    const aAlive=(aOwner?aOwner.chp>0:a.chp>0);
+    const bAlive=(bOwner?bOwner.chp>0:b.chp>0);
+    if(!aAlive||!bAlive)break;
+  }
+  const aAlive=(aOwner?aOwner.chp>0:a.chp>0);
+  const bAlive=(bOwner?bOwner.chp>0:b.chp>0);
+  if(aAlive&&!bAlive)return c1.id;if(bAlive&&!aAlive)return c2.id;return'draw';
+}
+const N=3000;
+console.log('=== ALL 7 CHARACTERS 1v1 MATRIX ===\n');
+for(let i=0;i<CLS.length;i++){for(let j=i+1;j<CLS.length;j++){
+  const c1=CLS[i],c2=CLS[j],res={[c1.id]:0,[c2.id]:0,draw:0};
+  for(let k=0;k<N;k++)res[sim(c1,c2)]++;
+  console.log(`${c1.l.padEnd(10)} vs ${c2.l.padEnd(10)}: ${(res[c1.id]/N*100).toFixed(1)}% | ${(res[c2.id]/N*100).toFixed(1)}%`);
+}}
+console.log('\n--- Average win rates ---');
+const wr={};CLS.forEach(c=>wr[c.l]={w:0,g:0});
+for(let i=0;i<CLS.length;i++){for(let j=i+1;j<CLS.length;j++){
+  const c1=CLS[i],c2=CLS[j],res={[c1.id]:0,[c2.id]:0,draw:0};
+  for(let k=0;k<N;k++)res[sim(c1,c2)]++;
+  wr[c1.l].w+=res[c1.id];wr[c1.l].g+=N;wr[c2.l].w+=res[c2.id];wr[c2.l].g+=N;
+}}
+Object.entries(wr).sort((a,b)=>b[1].w/b[1].g-a[1].w/a[1].g).forEach(([n,v])=>console.log(`  ${n.padEnd(10)}: ${(v.w/v.g*100).toFixed(1)}%`));
