@@ -452,7 +452,7 @@ const ABILITIES = {
   transference: { name:'Transference',   dmgType:'soul',     stat:'int', fixed:0,  dice:[1,1],  acc:99, uses:4,  desc:'Transfer all your status effects and stacks to the enemy. Ignores frozen inaction.', transference:true },
   // BATTLE BOAR ABILITIES
   headbutt:     { name:'Headbutt',       dmgType:'physical', stat:'atk', fixed:6,  dice:[1,4],  acc:0,  uses:20, desc:'Ram your head into the enemy. Low damage but 25% chance to flinch.', flinchChance:0.25 },
-  chomp:        { name:'Chomp',          dmgType:'physical', stat:'atk', fixed:4,  dice:[1,4],  acc:0,  uses:20, desc:'Bite down hard. Low damage but applies a stack of Wounded.', chomp:true },
+  chomp:        { name:'Chomp',          dmgType:'physical', stat:'atk', fixed:4,  dice:[1,4],  acc:0,  uses:20, desc:'Bite down hard. Low damage but 50% chance to apply a stack of Wounded.', chomp:true },
   // JAH APOSTLE ABILITIES
   moonlight:     { name:'Moonlight',       dmgType:'heal',     stat:'int', fixed:0,  dice:[1,1],  acc:99, uses:8,  desc:'Channel moonlight. Heals self for 25% max HP. The next ally to switch in is also healed for the same amount.', moonlight:true, heal:true },
   readScripture: { name:'Read Scripture',  dmgType:'soul',     stat:'int', fixed:10, dice:[1,8],  acc:0,  uses:14, desc:'Medium soul damage. Variable curse stacks: 50% none, 25% one, 15% two, 10% three.', readScripture:true },
@@ -2188,9 +2188,14 @@ async function executeAbility(attacker, defender, ability) {
     }
 
     // Eviscerate / Chomp: apply Wounded stack
-    if ((hitAbility.eviscerate || hitAbility.chomp) && !defender.fainted && defender.currentHp > 0) {
+    if (hitAbility.eviscerate && !defender.fainted && defender.currentHp > 0) {
       defender.woundedStacks++;
       log(`  ${defName} is wounded! (${defender.woundedStacks} stack${defender.woundedStacks>1?'s':''} — bonus soul damage on hit)`, 'status');
+      updateHpBar(!isPlayer ? 'player' : 'opponent');
+    }
+    if (hitAbility.chomp && !defender.fainted && defender.currentHp > 0 && Math.random() < 0.50) {
+      defender.woundedStacks++;
+      log(`  Chomp wounds ${defName}! (${defender.woundedStacks} stack${defender.woundedStacks>1?'s':''} — bonus soul damage on hit)`, 'status');
       updateHpBar(!isPlayer ? 'player' : 'opponent');
     }
 
