@@ -425,7 +425,7 @@ const ABILITIES = {
   shatter:      { name:'Shatter',         dmgType:'physical', stat:'atk', fixed:16, dice:[2,8],  acc:1,  uses:6,  desc:'Shatter a frozen target into pieces. Physical — strong vs low DEF, weak vs tanks. ONLY works on frozen enemies.', requiresFrozen:true },
   // PIT DWELLER ABILITIES
   tumpUp:       { name:'Tump Up',        dmgType:'physical', stat:'atk', fixed:7,  dice:[1,6],  acc:1,  uses:16, desc:'Hits twice. Second hit deals more damage but can miss.', doubleHit:true },
-  counterThrow: { name:'Counter Throw',  dmgType:'physical', stat:'atk', fixed:10, dice:[2,6],  acc:0,  uses:10, desc:'Act with reduced speed. Deals bonus damage if opponent already hit you this turn.', counterMove:true },
+  counterThrow: { name:'Counter Throw',  dmgType:'physical', stat:'atk', fixed:7,  dice:[1,6],  acc:0,  uses:10, desc:'Act with reduced speed. Deals 75% bonus damage if opponent already hit you this turn.', counterMove:true },
   subdue:       { name:'Subdue',         dmgType:'physical', stat:'atk', fixed:12, dice:[1,6],  acc:1,  uses:12, desc:'Pin the opponent down. Prevents them from switching next turn.', lockSwitch:true },
   deathLust:    { name:'Death Lust',     dmgType:'physical', stat:'atk', fixed:6,  dice:[1,4],  acc:99, uses:4,  desc:'Enter a frenzy. Grants +50% bonus soul damage on all attacks for 3 turns. Lost on switching.', grantDeathLust:true },
 };
@@ -1162,9 +1162,9 @@ async function executeAbility(attacker, defender, ability) {
 
     // Counter Throw: bonus damage if opponent already hit you this turn
     if (hitAbility.counterMove && attacker.damagedThisTurn) {
-      const bonus = Math.floor(dmg * 0.5);
+      const bonus = Math.floor(dmg * 0.75);
       dmg += bonus;
-      log(`  ${label ? label + ' — ' : ''}Counter! +${bonus} bonus damage!`, 'crit');
+      log(`  ${label ? label + ' — ' : ''}Counter! +${bonus} bonus damage (75%)!`, 'crit');
     }
 
     if (hitAbility.dmgType === 'soul') {
