@@ -421,47 +421,47 @@ const ABILITIES = {
   rejuvenation: { name:'Rejuvenation',   dmgType:'heal', stat:'def', fixed:9,  dice:[1,4],  acc:99, uses:5, desc:'Nature\'s restorative power. Very consistent.', heal:true },
   manaShield:   { name:'Mana Shield',    dmgType:'heal', stat:'int', fixed:7,  dice:[1,8],  acc:99, uses:4, desc:'Convert magical energy into healing.', heal:true },
   // LICH ABILITIES
-  lichBlast:    { name:'Lich Blast',      dmgType:'magical',  stat:'int', fixed:7,  dice:[2,6],  acc:0,  uses:14, desc:'Concentrated necrotic-arcane blast. High damage with a chance to freeze.', freezeChance:0.2 },
-  glaciate:     { name:'Glaciate',        dmgType:'magical',  stat:'int', fixed:5,  dice:[1,4],  acc:1,  uses:16, desc:'Wave of absolute cold. Low damage but very high freeze chance.', freezeChance:0.6 },
-  lichLifeDrain:{ name:'Life Drain',      dmgType:'magical',  stat:'int', fixed:6,  dice:[1,8],  acc:0,  uses:10, desc:'Siphon life force from the target. Heals proportion of damage dealt.', drain:0.5 },
-  shatter:      { name:'Shatter',         dmgType:'soul', stat:'int', fixed:18, dice:[2,6],  acc:1,  uses:6,  desc:'Shatter the frozen soul. High soul damage — bypasses all defences. ONLY works on frozen enemies.', requiresFrozen:true },
+  lichBlast:    { name:'Lich Blast',      dmgType:'magical',  stat:'int', fixed:8,  dice:[2,6],  acc:0,  uses:14, desc:'Concentrated necrotic-arcane blast. High damage with a chance to freeze.', freezeChance:0.2 },
+  glaciate:     { name:'Glaciate',        dmgType:'magical',  stat:'int', fixed:6,  dice:[1,4],  acc:1,  uses:16, desc:'Wave of absolute cold. Low damage but very high freeze chance.', freezeChance:0.6 },
+  lichLifeDrain:{ name:'Life Drain',      dmgType:'magical',  stat:'int', fixed:7,  dice:[1,8],  acc:0,  uses:10, desc:'Siphon life force from the target. Heals proportion of damage dealt.', drain:0.5 },
+  shatter:      { name:'Shatter',         dmgType:'soul', stat:'int', fixed:20, dice:[2,6],  acc:1,  uses:6,  desc:'Shatter the frozen soul. High soul damage — bypasses all defences. ONLY works on frozen enemies.', requiresFrozen:true },
   // PIT DWELLER ABILITIES
-  tumpUp:       { name:'Tump Up',        dmgType:'physical', stat:'atk', fixed:5,  dice:[1,6],  acc:1,  uses:16, desc:'Hits twice. Second hit deals more damage but can miss.', doubleHit:true },
-  counterThrow: { name:'Counter Throw',  dmgType:'physical', stat:'atk', fixed:7,  dice:[1,6],  acc:0,  uses:10, desc:'Act with reduced speed. Deals 75% bonus damage if opponent already hit you this turn.', counterMove:true },
-  subdue:       { name:'Subdue',         dmgType:'physical', stat:'atk', fixed:12, dice:[1,6],  acc:1,  uses:12, desc:'Pin the opponent down. Prevents them from switching next turn.', lockSwitch:true },
+  tumpUp:       { name:'Tump Up',        dmgType:'physical', stat:'atk', fixed:4,  dice:[1,6],  acc:1,  uses:16, desc:'Hits twice. Second hit deals more damage but can miss.', doubleHit:true },
+  counterThrow: { name:'Counter Throw',  dmgType:'physical', stat:'atk', fixed:6,  dice:[1,6],  acc:0,  uses:10, desc:'Act with reduced speed. Deals 75% bonus damage if opponent already hit you this turn.', counterMove:true },
+  subdue:       { name:'Subdue',         dmgType:'physical', stat:'atk', fixed:11, dice:[1,6],  acc:1,  uses:12, desc:'Pin the opponent down. Prevents them from switching next turn.', lockSwitch:true },
   deathLust:    { name:'Death Lust',     dmgType:'physical', stat:'atk', fixed:6,  dice:[1,4],  acc:99, uses:4,  desc:'Enter a frenzy. Adds +4 flat soul damage per hit for 2 turns. Lost on switching.', grantDeathLust:true },
   // SIR SHINING ABILITIES
-  radialStrike: { name:'Radial Strike',  dmgType:'physical', stat:'atk', fixed:9,  dice:[1,6],  acc:1,  uses:16, desc:'Sweeping holy blade strike. Chance to apply a stack of blind.', blindChance:0.4 },
+  radialStrike: { name:'Radial Strike',  dmgType:'physical', stat:'atk', fixed:8,  dice:[1,6],  acc:1,  uses:16, desc:'Sweeping holy blade strike. Chance to apply a stack of blind.', blindChance:0.4 },
   makeWay:      { name:'Make Way',       dmgType:'physical', stat:'atk', fixed:5,  dice:[1,4],  acc:99, uses:6,  desc:'Charge with massive speed boost and DEF bonus for the turn, then switch out at end of turn.', makeWay:true },
-  heavenlyBlow: { name:'Heavenly Blow',  dmgType:'physical', stat:'atk', fixed:8,  dice:[1,8],  acc:0,  uses:10, desc:'Half physical, half magical damage. Hits both defences.', splitDamage:true },
+  heavenlyBlow: { name:'Heavenly Blow',  dmgType:'physical', stat:'atk', fixed:7,  dice:[1,8],  acc:0,  uses:10, desc:'Half physical, half magical damage. Hits both defences.', splitDamage:true },
   healingPrayer:{ name:'Healing Prayer', dmgType:'heal',     stat:'cha', fixed:0,  dice:[1,1],  acc:99, uses:4,  desc:'Pray for healing. Instantly heals 25% max HP and cures all statuses.', healingPrayer:true, heal:true },
   // REX RANG ABILITIES
-  battlerang:   { name:'Battlerang',     dmgType:'physical', stat:'atk', fixed:8,  dice:[1,6],  acc:0,  uses:14, desc:'Medium physical damage. Boomerangs back — hits again at end of next turn. Chance to flinch (target loses action).', boomerang:true, flinchChance:0.25 },
-  emberang:     { name:'Emberang',       dmgType:'physical', stat:'atk', fixed:5,  dice:[1,6],  acc:0,  uses:12, desc:'Less damage than Battlerang but chance to burn. Hits again at end of next turn.', boomerang:true, burnChance:0.35 },
+  battlerang:   { name:'Battlerang',     dmgType:'physical', stat:'atk', fixed:7,  dice:[1,6],  acc:0,  uses:14, desc:'Medium physical damage. Boomerangs back — hits again at end of next turn. Chance to flinch (target loses action).', boomerang:true, flinchChance:0.25 },
+  emberang:     { name:'Emberang',       dmgType:'physical', stat:'atk', fixed:4,  dice:[1,6],  acc:0,  uses:12, desc:'Less damage than Battlerang but chance to burn. Hits again at end of next turn.', boomerang:true, burnChance:0.35 },
   whittle:      { name:'Whittle',        dmgType:'physical', stat:'atk', fixed:4,  dice:[1,4],  acc:99, uses:4,  desc:'Sharpen your edge. Grants +4 ATK until you switch out.', grantWhittle:true },
   swerve:       { name:'Swerve',         dmgType:'physical', stat:'atk', fixed:0,  dice:[1,1],  acc:99, uses:10, desc:'Act fast and dodge. High chance to evade enemy attacks this turn. Much less effective if used consecutively.', swerve:true },
   // COUNT COCTION ABILITIES
-  poisonDart:   { name:'Poison Dart',    dmgType:'physical', stat:'atk', fixed:8,  dice:[1,6],  acc:0,  uses:14, desc:'Quick physical strike. High chance to add 3 stacks of poison (4 with Rapid Transmission).', poisonChance:0.60, poisonStacks:3 },
+  poisonDart:   { name:'Poison Dart',    dmgType:'physical', stat:'atk', fixed:7,  dice:[1,6],  acc:0,  uses:14, desc:'Quick physical strike. High chance to add 3 stacks of poison (4 with Rapid Transmission).', poisonChance:0.60, poisonStacks:3 },
   goblinGas:    { name:'Goblin Gas',     dmgType:'physical', stat:'atk', fixed:0,  dice:[1,1],  acc:99, uses:4,  desc:'Deploy a poison gas cloud. Both fighters gain a poison stack each turn for 5 turns. Replaces existing terrain.', goblinGas:true },
   remedialOintment:{ name:'Remedial Ointment', dmgType:'heal', stat:'cha', fixed:0, dice:[1,1], acc:99, uses:6, desc:'Remove all poison from yourself and heal 5 HP per stack removed.', remedialOintment:true, heal:true },
   violentExtraction:{ name:'Violent Extraction', dmgType:'soul', stat:'atk', fixed:0, dice:[1,1], acc:99, uses:6, desc:'Rip all poison from the enemy. Deals 12 soul damage per stack removed.', violentExtraction:true },
   // VINY THE YOUNGER ABILITIES
-  petalStorm:   { name:'Petal Storm',    dmgType:'magical',  stat:'int', fixed:4,  dice:[1,4],  acc:0,  uses:14, desc:'Whirl of sharp petals. Small magic damage with 50% chance (+CHA) to apply a blind stack.', petalStorm:true, blindChance:0.50 },
+  petalStorm:   { name:'Petal Storm',    dmgType:'magical',  stat:'int', fixed:5,  dice:[1,4],  acc:0,  uses:14, desc:'Whirl of sharp petals. Small magic damage with 50% chance (+CHA) to apply a blind stack.', petalStorm:true, blindChance:0.50 },
   battleBoar:   { name:'Battle Boar',    dmgType:'physical', stat:'int', fixed:0,  dice:[1,1],  acc:99, uses:2,  desc:'Summon a Battle Boar to replace you. Reduced speed — you take a hit first. The boar fights in your place but dies if switched out.', summonBoar:true, reducedPriority:true },
-  ancientPower: { name:'Ancient Power',  dmgType:'magical',  stat:'int', fixed:14, dice:[2,6],  acc:0,  uses:6,  desc:'Channel ancient magic. Deals high magic damage at the end of 2 turns.', ancientPower:true },
+  ancientPower: { name:'Ancient Power',  dmgType:'magical',  stat:'int', fixed:15, dice:[2,6],  acc:0,  uses:6,  desc:'Channel ancient magic. Deals high magic damage at the end of 2 turns.', ancientPower:true },
   transference: { name:'Transference',   dmgType:'soul',     stat:'int', fixed:0,  dice:[1,1],  acc:99, uses:4,  desc:'Transfer all your status effects and stacks to the enemy. Ignores frozen inaction.', transference:true },
   // BATTLE BOAR ABILITIES
   headbutt:     { name:'Headbutt',       dmgType:'physical', stat:'atk', fixed:6,  dice:[1,4],  acc:0,  uses:20, desc:'Ram your head into the enemy. Low damage but 25% chance to flinch.', flinchChance:0.25 },
   chomp:        { name:'Chomp',          dmgType:'physical', stat:'atk', fixed:4,  dice:[1,4],  acc:0,  uses:20, desc:'Bite down hard. Low damage but applies a stack of Wounded.', chomp:true },
   // JAH APOSTLE ABILITIES
   moonlight:     { name:'Moonlight',       dmgType:'heal',     stat:'int', fixed:0,  dice:[1,1],  acc:99, uses:8,  desc:'Channel moonlight. Heals self for 25% max HP. The next ally to switch in is also healed for the same amount.', moonlight:true, heal:true },
-  readScripture: { name:'Read Scripture',  dmgType:'soul',     stat:'int', fixed:6,  dice:[1,6],  acc:0,  uses:14, desc:'Read from the forbidden text. Low soul damage. 30% chance to deal high soul damage instead.', readScripture:true },
+  readScripture: { name:'Read Scripture',  dmgType:'soul',     stat:'int', fixed:7,  dice:[1,6],  acc:0,  uses:14, desc:'Read from the forbidden text. Low soul damage. 30% chance to deal high soul damage instead.', readScripture:true },
   inviteJudgement:{ name:'Invite Judgement', dmgType:'soul',   stat:'int', fixed:0,  dice:[1,1],  acc:99, uses:6,  desc:'The active opponent loses 20% of their max HP. Ignores defences.', inviteJudgement:true },
   lookAtMe:      { name:'Look at Me',     dmgType:'soul',     stat:'cha', fixed:0,  dice:[1,1],  acc:99, uses:6,  desc:'Prevent the target from switching this turn. If they try, your team gains a 2-turn shield.', lookAtMe:true },
   // LEXILAS ABILITIES
-  recklessSwing: { name:'Reckless Swing', dmgType:'physical', stat:'atk', fixed:16, dice:[2,6], acc:0, uses:10, desc:'Devastating overhead swing. Deals 10% of damage dealt as recoil to self.', recklessSwing:true },
-  eviscerate:    { name:'Eviscerate',      dmgType:'physical', stat:'atk', fixed:8,  dice:[1,6], acc:0, uses:14, desc:'Slash deep. Medium physical damage. Applies a stack of Wounded (bonus soul damage after being hit, switching removes 1 stack).', eviscerate:true },
-  lexShieldBash: { name:'Shield Bash',    dmgType:'physical', stat:'atk', fixed:7,  dice:[1,4], acc:1, uses:16, desc:'Brace with your shield then strike. Gain DEF, lose SPD for the turn. 35% chance to stun.', shieldBash:true, stunChance:0.35 },
+  recklessSwing: { name:'Reckless Swing', dmgType:'physical', stat:'atk', fixed:14, dice:[2,6], acc:0, uses:10, desc:'Devastating overhead swing. Deals 10% of damage dealt as recoil to self.', recklessSwing:true },
+  eviscerate:    { name:'Eviscerate',      dmgType:'physical', stat:'atk', fixed:7,  dice:[1,6], acc:0, uses:14, desc:'Slash deep. Medium physical damage. Applies a stack of Wounded (bonus soul damage after being hit, switching removes 1 stack).', eviscerate:true },
+  lexShieldBash: { name:'Shield Bash',    dmgType:'physical', stat:'atk', fixed:6,  dice:[1,4], acc:1, uses:16, desc:'Brace with your shield then strike. Gain DEF, lose SPD for the turn. 35% chance to stun.', shieldBash:true, stunChance:0.35 },
   chivalry:      { name:'Chivalry',       dmgType:'heal',     stat:'def', fixed:0,  dice:[1,1], acc:99, uses:6, desc:'Honour the duel. Always goes last. Heals 30% max HP if Lexilas didn\'t take damage this turn.', chivalry:true, heal:true },
 };
 
@@ -590,7 +590,7 @@ const CLASSES = [
     stances: [
       { id:'gekyumesBlessing', name:"Gekyume's Blessing", desc:'INT+2. Healing and shields are boosted by 30%.',
         statBoosts:{int:2}, passive:'healBoost' },
-      { id:'forbiddenSermon', name:'Forbidden Sermon', desc:'CHA+2. At the end of each turn, apply a stack of Curse to the opponent.',
+      { id:'forbiddenSermon', name:'Forbidden Sermon', desc:'CHA+2. At the end of each turn, apply 2 stacks of Curse to the opponent.',
         statBoosts:{cha:2}, passive:'cursePerTurn' },
     ]},
   { id:'lexilas', label:'Warrior', fixedName:'Lexilas', color:'#c4a035',
@@ -2288,8 +2288,8 @@ async function tickStatus(battler) {
   if (battler.stance?.passive === 'cursePerTurn' && !battler.fainted) {
     const target = isPlayer ? opponent() : player();
     if (target && !target.fainted && target.currentHp > 0) {
-      target.curseStacks++;
-      log(`Forbidden Sermon! ${target.name} gains a curse stack! (${target.curseStacks})`, 'status');
+      target.curseStacks += 2;
+      log(`Forbidden Sermon! ${target.name} gains 2 curse stacks! (${target.curseStacks})`, 'status');
       updateHpBar(!isPlayer ? 'player' : 'opponent');
     }
   }
