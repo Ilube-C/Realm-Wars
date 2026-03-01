@@ -13,7 +13,7 @@ const AB={
   healingPrayer:{t:'h',s:'cha',f:0,dc:[1,1],u:4,hp:1,hl:1},
   battlerang:{t:'p',s:'atk',f:7,dc:[1,6],u:14,bm:1,fl:0.25},emberang:{t:'p',s:'atk',f:4,dc:[1,6],u:12,bm:1,bn:0.35},
   whittle:{t:'p',s:'atk',f:4,dc:[1,4],u:4,gw:1},swerve:{t:'p',s:'atk',f:0,dc:[1,1],u:10,sw:1},
-  poisonDart:{t:'p',s:'atk',f:7,dc:[1,6],u:14,pc:0.60,pst:3},goblinGas:{t:'p',s:'atk',f:0,dc:[1,1],u:4,gg:1},
+  poisonDart:{t:'p',s:'atk',f:7,dc:[1,6],u:14,pc:1.00,pst:2},goblinGas:{t:'p',s:'atk',f:0,dc:[1,1],u:4,gg:1},
   remedialOintment:{t:'h',s:'cha',f:0,dc:[1,1],u:6,ro:1,hl:1},violentExtraction:{t:'s',s:'atk',f:0,dc:[1,1],u:6,ve:1},
   recklessSwing:{t:'p',s:'atk',f:14,dc:[2,6],u:10,rs:1},eviscerate:{t:'p',s:'atk',f:7,dc:[1,6],u:14,ev:1},
   lexShieldBash:{t:'p',s:'atk',f:6,dc:[1,4],u:16,sb:1,sc:0.35},chivalry:{t:'h',s:'def',f:0,dc:[1,1],u:6,ch:1,hl:1},

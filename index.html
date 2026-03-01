@@ -441,7 +441,7 @@ const ABILITIES = {
   whittle:      { name:'Whittle',        dmgType:'physical', stat:'atk', fixed:4,  dice:[1,4],  acc:99, uses:4,  desc:'Sharpen your edge. Grants +4 ATK until you switch out.', grantWhittle:true },
   swerve:       { name:'Swerve',         dmgType:'physical', stat:'atk', fixed:0,  dice:[1,1],  acc:99, uses:10, desc:'Act fast and dodge. High chance to evade enemy attacks this turn. Much less effective if used consecutively.', swerve:true },
   // COUNT COCTION ABILITIES
-  poisonDart:   { name:'Poison Dart',    dmgType:'physical', stat:'atk', fixed:7,  dice:[1,6],  acc:0,  uses:14, desc:'Quick physical strike. High chance to add 3 stacks of poison (4 with Rapid Transmission).', poisonChance:0.60, poisonStacks:3 },
+  poisonDart:   { name:'Poison Dart',    dmgType:'physical', stat:'atk', fixed:7,  dice:[1,6],  acc:0,  uses:14, desc:'Quick physical strike. Always adds 2 stacks of poison (3 with Rapid Transmission).', poisonChance:1.00, poisonStacks:2 },
   goblinGas:    { name:'Goblin Gas',     dmgType:'physical', stat:'atk', fixed:0,  dice:[1,1],  acc:99, uses:4,  desc:'Deploy a poison gas cloud. Both fighters gain a poison stack each turn for 5 turns. Replaces existing terrain.', goblinGas:true },
   remedialOintment:{ name:'Remedial Ointment', dmgType:'heal', stat:'cha', fixed:0, dice:[1,1], acc:99, uses:6, desc:'Remove all poison from yourself and heal 5 HP per stack removed.', remedialOintment:true, heal:true },
   violentExtraction:{ name:'Violent Extraction', dmgType:'soul', stat:'atk', fixed:0, dice:[1,1], acc:99, uses:6, desc:'Rip all poison from the enemy. Deals 12 soul damage per stack removed.', violentExtraction:true },
