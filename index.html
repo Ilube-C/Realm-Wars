@@ -892,6 +892,9 @@ function renderRoster(who) {
   const activeIdx = who === 'player' ? playerActive : oppActive;
   const el = document.getElementById(who === 'player' ? 'player-roster' : 'opp-roster');
   el.innerHTML = '';
+  // If active unit is a summon, show the owner in the roster as switchable
+  const activeUnit = team[activeIdx];
+  const summonOwner = activeUnit?.isSummon ? activeUnit.summonOwner : null;
   team.forEach((b, i) => {
     const entry = document.createElement('div');
     entry.className = 'roster-entry' + (i === activeIdx ? ' active' : '') + (b.fainted ? ' fainted' : '');
@@ -907,6 +910,34 @@ function renderRoster(who) {
     }
     el.appendChild(entry);
   });
+  // Show summon owner (Druid) as an extra switchable roster entry
+  if (who === 'player' && summonOwner && !summonOwner.fainted) {
+    const entry = document.createElement('div');
+    entry.className = 'roster-entry switchable';
+    const pct = Math.max(0, summonOwner.currentHp / summonOwner.maxHp * 100);
+    const barCls = pct < 25 ? 'red' : pct < 50 ? 'yellow' : '';
+    entry.innerHTML = `<div class="roster-name" style="color:${summonOwner.cls.color}">${summonOwner.name}</div>
+      <div class="roster-class">${summonOwner.cls.label} ${Math.max(0,summonOwner.currentHp)}/${summonOwner.maxHp} (benched)</div>
+      <div class="roster-hp-bar"><div class="roster-hp-fill ${barCls}" style="width:${pct}%"></div></div>`;
+    entry.onclick = () => {
+      if (!isAnimating) {
+        // Kill the boar, restore Druid to slot, then switch to Druid
+        activeUnit.currentHp = 0; activeUnit.fainted = true;
+        log(`${activeUnit.name} is unsummoned and perishes!`, 'faint');
+        team[activeIdx] = summonOwner;
+        // "Switch" to the same slot (Druid is now there)
+        clearEffectsOnSwitchOut(summonOwner); // clear any old effects
+        removeStance(summonOwner);
+        summonOwner.justSwitchedIn = true;
+        log(`${summonOwner.name} returns to battle!`, 'switch');
+        renderActiveInfo('player'); renderSprite('player'); renderRoster('player'); renderMoves();
+        if (summonOwner.stances) {
+          promptPlayerStance(summonOwner);
+        }
+      }
+    };
+    el.appendChild(entry);
+  }
 }
 
 // ============================================================
@@ -2183,43 +2214,32 @@ async function handleFaint(who) {
   const deathLines = ['collapses!','crumples in defeat!','falls lifeless!','is vanquished!'];
   log(`${b.name} ${pick(deathLines)}`, 'faint');
 
-  // If a summon faints, restore the owner to that slot — they re-enter the fight
+  // If a summon faints, restore the owner to the slot (unfainted) — then normal death selection picks who comes in
   if (b.isSummon && b.summonOwner) {
     const owner = b.summonOwner;
-    team[active] = owner;
-    log(`${owner.name} returns from the sidelines!`, 'switch');
-    owner.justSwitchedIn = true;
-    renderRoster(who); renderActiveInfo(who); renderSprite(who);
-    if (who === 'player') renderMoves();
-    // Stance re-selection for the returning Druid
-    if (owner.stances) {
-      removeStance(owner);
-      if (who === 'opponent' || autoMode) { applyStance(owner, aiPickStance(owner)); }
-      else {
-        const stance = await showStanceModal(owner);
-        applyStance(owner, stance);
-        log(`${owner.name} enters ${stance.name} stance! ${stance.desc}`, 'info');
-      }
-      renderActiveInfo(who); renderRoster(who);
-      if (who === 'player') renderMoves();
-    }
-    return; // Owner takes over the slot — no need to pick another character
+    team[active] = owner; // Druid returns to roster as alive unit
+    log(`${owner.name} returns from the sidelines!`, 'info');
+    renderRoster(who);
+    // Fall through to normal death selection — Druid is now at team[active] and is alive,
+    // so they'll appear in the selection (since we check i !== active only for non-fainted)
   }
 
   renderRoster(who);
 
   await delay(600);
 
-  const alive = team.filter((t, i) => i !== active && !t.fainted);
+  // Include current slot in alive check if the unit there is alive (e.g. Druid restored after boar death)
+  const ownerReturned = !b.fainted || (team[active] && !team[active].fainted && team[active] !== b);
+  const alive = team.filter((t, i) => !t.fainted && (i !== active || ownerReturned));
   if (alive.length === 0) return;
 
   let nextIdx;
   if (who === 'player' && !autoMode) {
-    // Player picks their next character
-    nextIdx = await showDeathSelectionModal(team, active);
+    // Player picks their next character (pass -1 as exclude so all alive shown when owner returned)
+    nextIdx = await showDeathSelectionModal(team, ownerReturned ? -1 : active);
   } else {
-    // AI picks randomly from alive characters
-    const aliveIndices = team.map((t, i) => i).filter(i => i !== active && !team[i].fainted);
+    // AI picks from alive characters
+    const aliveIndices = team.map((t, i) => i).filter(i => !team[i].fainted && (i !== active || ownerReturned));
     nextIdx = pick(aliveIndices);
   }
 
