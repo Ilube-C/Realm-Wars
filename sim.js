@@ -319,7 +319,7 @@ function simulateBattle(cls1, cls2) {
         // Boomerang
         if (ability.boomerang && defender.currentHp > 0) {
           const bonusMult = attacker.stance?.passive === 'boomerangBonus' ? 1.3 : 1.0;
-          defender.boomerangHits.push({ damage: Math.round(dmg * 0.6 * bonusMult), source: attacker.name });
+          defender.boomerangHits.push({ damage: Math.round(dmg * 1.0 * bonusMult), source: attacker.name });
         }
       }
 
