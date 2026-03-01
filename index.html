@@ -2511,11 +2511,19 @@ function showDmgFloat(who, amount, isCrit, isHeal) {
   const el = document.createElement('div');
   el.className = 'dmg-float' + (isCrit ? ' crit' : '') + (isHeal ? ' heal' : '');
   el.style.color = isHeal ? '#6aaa5a' : '#cc6644';
-  el.textContent = (isHeal ? '+' : '-') + amount;
+  el.textContent = (isHeal ? '+' : '-') + amount + (isCrit ? ' CRIT!' : '');
   el.style.left = (30 + Math.random() * 40) + 'px';
   el.style.top = '20px';
   area.appendChild(el);
   setTimeout(() => el.remove(), 1000);
+  // Red flash on crit
+  if (isCrit && !isHeal) {
+    const overlay = document.createElement('div');
+    overlay.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(200,30,30,0.25);pointer-events:none;z-index:9999;transition:opacity 0.4s;';
+    document.body.appendChild(overlay);
+    setTimeout(() => { overlay.style.opacity = '0'; }, 50);
+    setTimeout(() => overlay.remove(), 500);
+  }
 }
 
 // ============================================================
