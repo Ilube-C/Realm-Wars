@@ -1155,6 +1155,16 @@ async function promptPlayerStance(combatant) {
   renderActiveInfo('player'); renderRoster('player'); renderMoves();
 }
 
+function clearEffectsOnSwitchOut(unit) {
+  unit.deathLustTurns = 0;
+  if (unit.whittleBoost) { unit.stats.atk -= unit.whittleBoost; unit.whittleBoost = 0; }
+  if (unit.duelistStacks) { unit.stats.atk -= unit.duelistStacks; unit.duelistStacks = 0; }
+  if (unit.woundedStacks > 0) { unit.woundedStacks--; log(`${unit.name} shakes off a wound on switch-out (${unit.woundedStacks} remaining).`, 'info'); }
+  unit.swerveActive = false; unit.swerveLastTurn = false;
+  unit.bladeTossCooldown = false;
+  removeStance(unit);
+}
+
 async function doSwitch(newIdx) {
   if (isAnimating || playerTeam[newIdx].fainted) return;
   if (player().switchLocked) {
@@ -1164,13 +1174,7 @@ async function doSwitch(newIdx) {
   isAnimating = true;
   try {
     const oldP = player();
-    oldP.deathLustTurns = 0; // Death Lust lost on switching
-    if (oldP.whittleBoost) { oldP.stats.atk -= oldP.whittleBoost; oldP.whittleBoost = 0; } // Whittle lost on switching
-    if (oldP.duelistStacks) { oldP.stats.atk -= oldP.duelistStacks; oldP.duelistStacks = 0; } // Duelist lost on switching
-    if (oldP.woundedStacks > 0) { oldP.woundedStacks--; log(`${oldP.name} shakes off a wound on switch-out (${oldP.woundedStacks} remaining).`, 'info'); }
-    oldP.swerveActive = false; oldP.swerveLastTurn = false;
-    oldP.bladeTossCooldown = false;
-    removeStance(oldP);
+    clearEffectsOnSwitchOut(oldP);
     playerActive = newIdx;
     // Always clear stance on the incoming character so they get a fresh pick
     removeStance(player());
@@ -1354,50 +1358,44 @@ async function executeTurn(moveIdx) {
       }
     }
 
-    // Make Way: auto-switch at end of turn (only in 4v4)
-    if (!p.fainted && playerAb.makeWay && playerTeam.length > 1) {
-      const alive = playerTeam.filter((t,i) => i !== playerActive && !t.fainted);
-      if (alive.length > 0) {
-        log(`${p.name} charges through and withdraws!`, 'switch');
-        p.makeWaySwitch = false;
-        // trigger switch
-        const nextIdx = playerTeam.indexOf(alive[0]);
-        if (!autoMode && alive.length > 1) {
-          // Let player pick (reuse death selection)
-          const pickIdx = await showDeathSelectionModal(playerTeam, playerActive);
-          removeStance(p);
-          playerActive = pickIdx;
-        } else {
-          removeStance(p);
-          playerActive = nextIdx;
-        }
-        const next = player();
-        log(`${next.name} the ${next.cls.label} enters the battle!`, 'switch');
-        renderActiveInfo('player'); renderSprite('player'); renderRoster('player');
-        if (next.stances) {
-          if (autoMode) { applyStance(next, aiPickStance(next)); }
-          else {
-            const stance = await showStanceModal(next);
-            applyStance(next, stance);
-            log(`${next.name} enters ${stance.name} stance! ${stance.desc}`, 'info');
-          }
-          renderActiveInfo('player'); renderRoster('player');
-        }
-        renderMoves();
+    // Make Way / Guerilla Fighter: auto-switch at end of turn
+    async function autoSwitchOut(unit, team, activeIdx, side, reason) {
+      const alive = team.filter((t,i) => i !== activeIdx && !t.fainted);
+      if (alive.length === 0) return activeIdx;
+      log(`${unit.name} ${reason}`, 'switch');
+      clearEffectsOnSwitchOut(unit);
+      unit.makeWaySwitch = false;
+      let newIdx;
+      if (side === 'player' && !autoMode && alive.length > 1) {
+        newIdx = await showDeathSelectionModal(team, activeIdx);
+      } else {
+        newIdx = team.indexOf(alive[0]);
       }
+      if (side === 'player') playerActive = newIdx; else oppActive = newIdx;
+      const next = side === 'player' ? player() : opponent();
+      next.justSwitchedIn = true;
+      log(`${next.name} the ${next.cls.label} enters the battle!`, 'switch');
+      renderActiveInfo(side); renderSprite(side); renderRoster(side);
+      if (next.stances) {
+        if (autoMode || side === 'opponent') { applyStance(next, aiPickStance(next)); }
+        else {
+          const stance = await showStanceModal(next);
+          applyStance(next, stance);
+          log(`${next.name} enters ${stance.name} stance! ${stance.desc}`, 'info');
+        }
+        renderActiveInfo(side); renderRoster(side);
+      }
+      if (side === 'player') renderMoves();
+      return newIdx;
     }
-    if (!o.fainted && oppAb.makeWay && oppTeam.length > 1) {
-      const alive = oppTeam.filter((t,i) => i !== oppActive && !t.fainted);
-      if (alive.length > 0) {
-        log(`${o.name} charges through and withdraws!`, 'switch');
-        removeStance(o);
-        oppActive = oppTeam.indexOf(alive[0]);
-        const next = opponent();
-        next.justSwitchedIn = true;
-        if (next.stances) { applyStance(next, aiPickStance(next)); }
-        log(`${next.name} the ${next.cls.label} enters the battle!`, 'switch');
-        renderActiveInfo('opponent'); renderSprite('opponent'); renderRoster('opponent');
-      }
+
+    if (!p.fainted && (playerAb.makeWay || p.makeWaySwitch) && playerTeam.length > 1) {
+      await autoSwitchOut(p, playerTeam, playerActive, 'player',
+        playerAb.makeWay ? 'charges through and withdraws!' : 'uses the opening to escape!');
+    }
+    if (!o.fainted && (oppAb.makeWay || o.makeWaySwitch) && oppTeam.length > 1) {
+      await autoSwitchOut(o, oppTeam, oppActive, 'opponent',
+        oppAb.makeWay ? 'charges through and withdraws!' : 'uses the opening to escape!');
     }
 
     if (checkWin()) return;
@@ -1579,9 +1577,7 @@ async function executeAbility(attacker, defender, ability) {
         log(`  ${label ? label + ': ' : ''}${defName} swerves out of the way!`, 'miss');
         // Guerilla Fighter: switch out on dodge
         if (defender.stance?.passive === 'guerillaSwitchOut' && !window.TESTING_1V1) {
-          // Will be handled by switch logic in 4v4
           defender.makeWaySwitch = true;
-          log(`  Guerilla Fighter! ${defName} uses the opening to escape!`, 'switch');
         }
         return 0;
       }
