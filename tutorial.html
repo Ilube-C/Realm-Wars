@@ -1,0 +1,529 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+  <meta charset="utf-8" />
+  <meta name="generator" content="pandoc" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
+  <title>Realm Wars — Player Guide</title>
+  <style>
+    /* Default styles provided by pandoc.
+    ** See https://pandoc.org/MANUAL.html#variables-for-html for config info.
+    */
+    code{white-space: pre-wrap;}
+    span.smallcaps{font-variant: small-caps;}
+    div.columns{display: flex; gap: min(4vw, 1.5em);}
+    div.column{flex: auto; overflow-x: auto;}
+    div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+    /* The extra [class] is a hack that increases specificity enough to
+       override a similar rule in reveal.js */
+    ul.task-list[class]{list-style: none;}
+    ul.task-list li input[type="checkbox"] {
+      font-size: inherit;
+      width: 0.8em;
+      margin: 0 0.8em 0.2em -1.6em;
+      vertical-align: middle;
+    }
+    .display.math{display: block; text-align: center; margin: 0.5rem auto;}
+  </style>
+  <link rel="stylesheet" href="https://cdn.simplecss.org/simple.min.css" />
+</head>
+<body>
+<header id="title-block-header">
+<h1 class="title">Realm Wars — Player Guide</h1>
+</header>
+<h1 id="realm-wars-player-guide">REALM WARS — Player Guide</h1>
+<h2 id="what-is-realm-wars">What is Realm Wars?</h2>
+<p>Realm Wars is a turn-based 4v4 team combat game. You command a team
+of 4 characters against an opposing team. Each character has unique
+abilities, stats, and stances that define how they fight. The last team
+standing wins.</p>
+<hr />
+<h2 id="the-basics">The Basics</h2>
+<h3 id="stats">Stats</h3>
+<p>Every character has 6 stats, randomly generated each game based on
+their class:</p>
+<table>
+<colgroup>
+<col style="width: 31%" />
+<col style="width: 68%" />
+</colgroup>
+<thead>
+<tr>
+<th>Stat</th>
+<th>What it does</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>ATK</strong></td>
+<td>Scales physical damage dealt. Also determines crit chance.</td>
+</tr>
+<tr>
+<td><strong>DEF</strong></td>
+<td>Reduces physical damage taken.</td>
+</tr>
+<tr>
+<td><strong>INT</strong></td>
+<td>Scales magical damage dealt. Reduces magical damage taken.</td>
+</tr>
+<tr>
+<td><strong>CON</strong></td>
+<td>Determines max HP. HP = 20 + (CON × 4).</td>
+</tr>
+<tr>
+<td><strong>CHA</strong></td>
+<td>Increases chance of applying status effects (blind, freeze, stun,
+poison, etc).</td>
+</tr>
+<tr>
+<td><strong>SPD</strong></td>
+<td>Determines who acts first each turn (initiative = 2d8 + SPD).</td>
+</tr>
+</tbody>
+</table>
+<h3 id="damage-types">Damage Types</h3>
+<p>There are 3 damage types. No weaknesses or resistances — damage type
+matters for which stat scales it:</p>
+<ul>
+<li><strong>Physical</strong> — Scaled by ATK vs DEF</li>
+<li><strong>Magical</strong> — Scaled by INT vs INT</li>
+<li><strong>Soul</strong> — Flat damage, ignores stats entirely</li>
+</ul>
+<h3 id="damage-formula">Damage Formula</h3>
+<pre><code>(Fixed Base + Dice Roll) × (0.5 + 0.5 × (2d6 + Attacker Stat) / (2d6 + Defender Stat))</code></pre>
+<p>Every attack has a fixed base (consistent) plus dice (variance). The
+tooltip shows the standard deviation (σ) so you know how swingy a move
+is.</p>
+<h3 id="crits">Crits</h3>
+<pre><code>d100 + ATK &gt; 100 → 1.5× damage</code></pre>
+<p>A character with 15 ATK has a 15% crit chance. Crits apply to ALL
+damage types — even magical and soul. This gives ATK value to every
+character. You’ll see a red screen flash and “CRIT!” when one lands.</p>
+<hr />
+<h2 id="stances">Stances</h2>
+<p>When a character enters battle (or switches in), you pick one of two
+stances. This choice is <strong>locked</strong> until they switch out.
+Each stance gives:</p>
+<ol type="1">
+<li><strong>Stat boosts</strong> (e.g. ATK+3, DEF+2)</li>
+<li><strong>A passive ability</strong> (e.g. stun on hit, regen per
+turn, lifesteal)</li>
+</ol>
+<p>Choosing the right stance for the matchup is one of the most
+important decisions in the game.</p>
+<hr />
+<h2 id="status-effects-vs-buffs">Status Effects vs Buffs</h2>
+<p><strong>Status effects PERSIST through switches:</strong> - ❄️
+<strong>Frozen</strong> — 60% SPD reduction, 66% chance to skip your
+turn. Thaws when you take damage. 20% damage reduction while frozen. -
+💫 <strong>Stun</strong> — Halves SPD, ATK, INT, and CHA for 1 turn. You
+still act, just weaker. - 🔥 <strong>Burn</strong> — Takes 4% max HP per
+stack per turn. 50% chance to lose a stack each tick. - 🧪
+<strong>Poison</strong> — Takes 2 HP per stack per turn. Stacks never
+fall off naturally — only removed by abilities. - 👁️
+<strong>Blind</strong> — Each stack = 15% miss chance. Consumed on miss.
+- 🩸 <strong>Wound</strong> — Each stack adds +2 damage to all attacks
+against you. - 🌀 <strong>Curse</strong> — 35% chance per stack per turn
+to transform into any random status (frozen, stun, blind+1, burn+1,
+poison+1, wound+1).</p>
+<p><strong>Buffs/Effects CLEAR on switch-out:</strong> - Death Lust (+4
+soul damage) - Whittle (stacking ATK boost) - Swerve (dodge active) -
+Duelist (ATK on hit) - Switch Lock (Subdue pin)</p>
+<hr />
+<h2 id="switching">Switching</h2>
+<p>You can switch your active character by clicking a teammate in the
+roster. But there’s a cost: <strong>the opponent gets a free
+attack</strong> on your incoming character.</p>
+<p>If both sides switch on the same turn, neither gets a free attack —
+it’s a fair trade.</p>
+<p><strong>Switch-in effects</strong> (Flashy Arrival blind, Guerilla
+entry Battlerang, Overgrowth vines) trigger when you switch in — unless
+the opponent has the <strong>Overwhelming</strong> stance, which
+suppresses them.</p>
+<hr />
+<h2 id="the-characters">The Characters</h2>
+<h3 id="sir-shining-paladin">🛡️ Sir Shining — Paladin</h3>
+<p><strong>Identity:</strong> Tanky anchor with self-healing and blind
+pressure.</p>
+<table>
+<colgroup>
+<col style="width: 32%" />
+<col style="width: 21%" />
+<col style="width: 46%" />
+</colgroup>
+<thead>
+<tr>
+<th>Ability</th>
+<th>Type</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Radial Strike</td>
+<td>Physical</td>
+<td>Reliable damage + 40% blind chance</td>
+</tr>
+<tr>
+<td>Heavenly Blow</td>
+<td>Hybrid</td>
+<td>Physical + Magical split damage</td>
+</tr>
+<tr>
+<td>Healing Prayer</td>
+<td>Heal</td>
+<td>Heals 25% max HP + cures ALL statuses. Bypasses frozen.</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Stances:</strong> - <em>Battlefield Star</em> — CHA+2. 25%
+blind chance on all attacks. - <em>Flashy Arrival</em> — DEF+2. Applies
+2 blind stacks on switch-in.</p>
+<hr />
+<h3 id="pit-dweller-berserker">💀 Pit Dweller — Berserker</h3>
+<p><strong>Identity:</strong> Aggressive brawler with stun pressure and
+self-buffing.</p>
+<table>
+<colgroup>
+<col style="width: 32%" />
+<col style="width: 21%" />
+<col style="width: 46%" />
+</colgroup>
+<thead>
+<tr>
+<th>Ability</th>
+<th>Type</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Tump Up</td>
+<td>Physical</td>
+<td>Double hit (2nd hit 1.5×, 30% miss chance)</td>
+</tr>
+<tr>
+<td>Counter Throw</td>
+<td>Physical</td>
+<td>Halved initiative, +75% bonus if damaged this turn</td>
+</tr>
+<tr>
+<td>Subdue</td>
+<td>Physical</td>
+<td>Pins opponent — prevents switching next turn</td>
+</tr>
+<tr>
+<td>Death Lust</td>
+<td>Buff</td>
+<td>+4 soul damage on all attacks for 2 turns</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Stances:</strong> - <em>Dirty Boxing</em> — CON+2. 30% stun
+chance on all attacks. - <em>Pit Veteran</em> — DEF+2. Regenerates 5%
+max HP per turn.</p>
+<hr />
+<h3 id="lich-king-mage">❄️ Lich King — Mage</h3>
+<p><strong>Identity:</strong> Freeze-and-burst mage with lifesteal
+sustain.</p>
+<table>
+<colgroup>
+<col style="width: 32%" />
+<col style="width: 21%" />
+<col style="width: 46%" />
+</colgroup>
+<thead>
+<tr>
+<th>Ability</th>
+<th>Type</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Lich Blast</td>
+<td>Magical</td>
+<td>Solid damage + 20% freeze chance</td>
+</tr>
+<tr>
+<td>Glaciate</td>
+<td>Magical</td>
+<td>Lower damage but 60% freeze chance</td>
+</tr>
+<tr>
+<td>Life Drain</td>
+<td>Magical</td>
+<td>Heals 40% of damage dealt</td>
+</tr>
+<tr>
+<td>Shatter</td>
+<td>Soul</td>
+<td>18 + 2d6 soul damage. ONLY works on frozen targets. Removes
+freeze.</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Stances:</strong> - <em>Arctic Aura</em> — CON+2, CHA+2. +10%
+freeze chance on all attacks. - <em>Soul Snatcher</em> — INT+2. Heals
+10% of all damage dealt.</p>
+<hr />
+<h3 id="rex-rang-ranger">🏹 Rex Rang — Ranger</h3>
+<p><strong>Identity:</strong> Skirmisher with boomerang mechanics and
+two distinct playstyles.</p>
+<table>
+<colgroup>
+<col style="width: 32%" />
+<col style="width: 21%" />
+<col style="width: 46%" />
+</colgroup>
+<thead>
+<tr>
+<th>Ability</th>
+<th>Type</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Battlerang</td>
+<td>Physical</td>
+<td>Hits now + returns next turn for equal damage. 25% flinch.</td>
+</tr>
+<tr>
+<td>Emberang</td>
+<td>Physical</td>
+<td>Boomerang + 35% burn chance</td>
+</tr>
+<tr>
+<td>Whittle</td>
+<td>Buff</td>
+<td>+4 ATK per use (stacks, lost on switch-out)</td>
+</tr>
+<tr>
+<td>Swerve</td>
+<td>Dodge</td>
+<td>100% dodge first use, 20% consecutive. +50% initiative.</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Stances:</strong> - <em>Patient Killer</em> — ATK+2.
+Boomerang returns deal 130% damage. - <em>Guerilla Fighter</em> — SPD+2.
+Throws 30% Battlerang on switch-in. Swerve-dodge forces switch-out.</p>
+<hr />
+<h3 id="count-coction-rogue">🗡️ Count Coction — Rogue</h3>
+<p><strong>Identity:</strong> Poison economy specialist. Stacks poison,
+then cashes out.</p>
+<table>
+<colgroup>
+<col style="width: 32%" />
+<col style="width: 21%" />
+<col style="width: 46%" />
+</colgroup>
+<thead>
+<tr>
+<th>Ability</th>
+<th>Type</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Poison Dart</td>
+<td>Physical</td>
+<td>Damage + guaranteed 2 poison stacks</td>
+</tr>
+<tr>
+<td>Goblin Gas</td>
+<td>Terrain</td>
+<td>Both sides gain 1 poison per turn for 5 turns</td>
+</tr>
+<tr>
+<td>Remedial Ointment</td>
+<td>Heal</td>
+<td>Removes all self-poison, heals 9 HP per stack</td>
+</tr>
+<tr>
+<td>Violent Extraction</td>
+<td>Soul</td>
+<td>Removes all enemy poison, deals 15 soul damage per stack</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Stances:</strong> - <em>Rapid Transmission</em> — CHA+2. 30%
+chance to add +1 poison on any poison application. - <em>Night
+Terrors</em> — SPD+2. Act faster.</p>
+<hr />
+<h3 id="lexilas-warrior">⚔️ Lexilas — Warrior</h3>
+<p><strong>Identity:</strong> Raw physical duelist with the biggest
+single hit in the game.</p>
+<table>
+<colgroup>
+<col style="width: 32%" />
+<col style="width: 21%" />
+<col style="width: 46%" />
+</colgroup>
+<thead>
+<tr>
+<th>Ability</th>
+<th>Type</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Reckless Swing</td>
+<td>Physical</td>
+<td>14+2d6 massive damage (10% recoil to self)</td>
+</tr>
+<tr>
+<td>Eviscerate</td>
+<td>Physical</td>
+<td>Applies Wounded stacks (+2 dmg taken per stack)</td>
+</tr>
+<tr>
+<td>Shield Bash</td>
+<td>Physical</td>
+<td>+4 DEF during attack, 35% stun chance</td>
+</tr>
+<tr>
+<td>Chivalry</td>
+<td>Heal</td>
+<td>Goes LAST. Heals 30% max HP if you didn’t take damage this
+turn.</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Stances:</strong> - <em>Overwhelming</em> — ATK+3. Suppresses
+enemy stance passive AND switch-in effects. - <em>Duelist</em> — DEF+2.
+Gain +5 ATK on hit (consumed on next attack).</p>
+<hr />
+<h3 id="viny-the-younger-druid">🌿 Viny the Younger — Druid</h3>
+<p><strong>Identity:</strong> Glass cannon disruptor with delayed damage
+and status transfer.</p>
+<table>
+<colgroup>
+<col style="width: 32%" />
+<col style="width: 21%" />
+<col style="width: 46%" />
+</colgroup>
+<thead>
+<tr>
+<th>Ability</th>
+<th>Type</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Petal Storm</td>
+<td>Magical</td>
+<td>Damage + 50% blind chance</td>
+</tr>
+<tr>
+<td>Ancient Power</td>
+<td>Magical</td>
+<td>15+2d6 delayed nuke — lands 2 turns later</td>
+</tr>
+<tr>
+<td>Transference</td>
+<td>Soul</td>
+<td>Dumps ALL your statuses onto the enemy</td>
+</tr>
+<tr>
+<td>Battle Boar</td>
+<td>Summon</td>
+<td>Summons a boar with fixed stats (Druid goes to bench)</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Stances:</strong> - <em>Overgrowth</em> — INT+2. Sets Vine
+terrain on switch-in (4 dmg/turn to faster unit, 5 turns). -
+<em>Restoration</em> — CON+2. Heals 20% max HP when switching out.</p>
+<hr />
+<h3 id="jah-apostle-cleric">✝️ Jah Apostle — Cleric</h3>
+<p><strong>Identity:</strong> Pure support that controls the battlefield
+through curse and shields.</p>
+<table>
+<colgroup>
+<col style="width: 32%" />
+<col style="width: 21%" />
+<col style="width: 46%" />
+</colgroup>
+<thead>
+<tr>
+<th>Ability</th>
+<th>Type</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Moonlight</td>
+<td>Heal</td>
+<td>Heals self 25% max HP + stores heal for next ally to switch in</td>
+</tr>
+<tr>
+<td>Read Scripture</td>
+<td>Soul</td>
+<td>10+1d8 damage + variable curse (50% 0, 25% 1, 15% 2, 10% 3
+stacks)</td>
+</tr>
+<tr>
+<td>Riot</td>
+<td>Soul</td>
+<td>5+1d4 damage + 2 curse stacks + 1 burn stack</td>
+</tr>
+<tr>
+<td>Look at Me</td>
+<td>Utility</td>
+<td>If opponent tries to switch this turn, it fails + your team gets
+shields</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Stances:</strong> - <em>Gekyume’s Blessing</em> — INT+2.
+Heals and shields boosted by 30%. Shield duration +1 turn. Shield HP
+15→20. - <em>Forbidden Sermon</em> — CHA+2. Applies 2 curse stacks to
+the opponent every turn passively.</p>
+<hr />
+<h2 id="shield-mechanic">Shield Mechanic</h2>
+<p>Shields are an HP pool that absorbs damage. A 15 HP shield blocks all
+damage up to 15 — any excess goes through to your real HP. Shields
+persist through switches and last a set number of turns.</p>
+<hr />
+<h2 id="terrain">Terrain</h2>
+<p>Only one terrain can be active at a time. A new terrain cancels the
+previous one.</p>
+<ul>
+<li><strong>Goblin Gas</strong> — Both sides gain 1 poison stack per
+turn (5 turns)</li>
+<li><strong>Overgrowth Vines</strong> — The faster unit takes 4 fixed
+damage per turn (5 turns)</li>
+</ul>
+<hr />
+<h2 id="tips">Tips</h2>
+<ol type="1">
+<li><strong>Stances are permanent until switch-out.</strong> Pick based
+on the matchup, not in a vacuum.</li>
+<li><strong>Switching costs a free hit</strong> but resets your buffs
+and lets you pick a new stance. Sometimes the matchup advantage is worth
+the damage.</li>
+<li><strong>Poison never falls off.</strong> Against Rogue, either kill
+them fast or bring Healing Prayer / Remedial Ointment.</li>
+<li><strong>Frozen thaws on damage.</strong> Don’t waste attacks on a
+frozen target unless you’re using Shatter.</li>
+<li><strong>Curse is unpredictable but powerful.</strong> Each stack has
+a 35% chance per turn to become any status. Stack enough curse and the
+enemy drowns in random debuffs.</li>
+<li><strong>Chivalry goes last deliberately.</strong> If you predict the
+enemy won’t attack your Warrior (maybe they switch or use a buff), it’s
+a free 30% heal.</li>
+<li><strong>Transference is a hard counter to Forbidden Sermon.</strong>
+The Cleric curses you? Dump it right back.</li>
+<li><strong>Overwhelming suppresses passives AND switch-in
+effects.</strong> Warrior shuts down stance-dependent characters.</li>
+</ol>
+<hr />
+<p><em>Realm Wars — built by Chris, اَلمهندس &amp; Ian</em></p>
+</body>
+</html>
