@@ -367,60 +367,62 @@ const TYPE_ICONS = { physical:'\u2694', magical:'\u2728', soul:'\uD83D\uDC80', h
 //  ABILITIES - Higher expected damage = more dice sides, fewer dice = higher variance
 // ============================================================
 const ABILITIES = {
-  // PHYSICAL — All pure damage ≈11 avg (before stat mod). Variance differs by dice shape.
-  swordSlash:   { name:'Sword Slash',     dmgType:'physical', stat:'atk', dice:[4,4], bonus:1, acc:1,  uses:20, desc:'Reliable quick slashes. Very consistent damage output.' },
-  shieldBash:   { name:'Shield Bash',     dmgType:'physical', stat:'atk', dice:[2,6], bonus:1, acc:0,  uses:14, desc:'Heavy shield strike. Lower damage but may stun the target.', effect:'stun' },
-  execute:      { name:'Execute',         dmgType:'physical', stat:'atk', dice:[1,20],bonus:1, acc:-1, uses:5,  desc:'Devastating finishing blow. Same average damage but wildly unpredictable.' },
-  cleave:       { name:'Cleave',          dmgType:'physical', stat:'atk', dice:[2,10],bonus:0, acc:0,  uses:10, desc:'Wide sweeping slash. High variance — big hits or weak swings.' },
-  quickStrike:  { name:'Quick Strike',    dmgType:'physical', stat:'spd', dice:[6,2], bonus:2, acc:2,  uses:22, desc:'Rapid precise jabs. Extremely consistent and hard to dodge.' },
-  backstab:     { name:'Backstab',        dmgType:'physical', stat:'spd', dice:[1,18],bonus:2, acc:0,  uses:8,  desc:'Strike from shadows. High variance — massive hit or barely a scratch.' },
-  ragingBlow:   { name:'Raging Blow',     dmgType:'physical', stat:'atk', dice:[1,22],bonus:0, acc:-1, uses:5,  desc:'Berserk overhand strike. Maximum variance — true feast or famine.' },
-  flurry:       { name:'Flurry of Blows', dmgType:'physical', stat:'spd', dice:[5,3], bonus:1, acc:1,  uses:20, desc:'Rapid combination strikes. Very consistent and reliable.' },
-  crossbow:     { name:'Crossbow Shot',   dmgType:'physical', stat:'spd', dice:[2,8], bonus:2, acc:1,  uses:15, desc:'Precise ranged bolt. Moderate variance, good accuracy.' },
-  // MAGICAL — Same avg damage, different variance. Auto-hit trades damage for reliability.
-  arcaneBolt:   { name:'Arcane Bolt',     dmgType:'magical',  stat:'int', dice:[4,4], bonus:1, acc:1,  uses:20, desc:'Focused arcane energy. Consistent and reliable.' },
-  arcaneBarrage:{ name:'Arcane Barrage',  dmgType:'magical',  stat:'int', dice:[2,10],bonus:0, acc:0,  uses:10, desc:'Volley of magical projectiles. Same average, wider spread.' },
-  disintegrate: { name:'Disintegrate',    dmgType:'magical',  stat:'int', dice:[1,22],bonus:0, acc:-1, uses:4,  desc:'Beam of pure destruction. Can obliterate or fizzle completely.' },
-  arcaneMissile:{ name:'Arcane Missiles', dmgType:'magical',  stat:'int', dice:[6,2], bonus:0, acc:99, uses:15, desc:'Unerring bolts. Always hits, always consistent. Lower damage for guaranteed value.' },
-  chaosBolt:    { name:'Chaos Bolt',      dmgType:'magical',  stat:'cha', dice:[1,18],bonus:2, acc:0,  uses:8,  desc:'Unstable magical energy. High variance chaotic damage.' },
-  kiBlast:      { name:'Ki Blast',        dmgType:'magical',  stat:'def', dice:[3,5], bonus:2, acc:0,  uses:16, desc:'Focused spiritual energy. Moderate variance.' },
-  // ELEMENTAL — Status moves (slow) trade damage for crowd control.
-  fireBolt:     { name:'Fire Bolt',       dmgType:'magical',stat:'int', dice:[4,4], bonus:1, acc:1,  uses:20, desc:'Small bolt of flame. Consistent elemental damage.' },
-  lightning:    { name:'Lightning Strike', dmgType:'magical',stat:'int', dice:[2,10],bonus:0, acc:0,  uses:10, desc:'Crackling bolt. Same average damage, much swingier.' },
-  meteor:       { name:'Meteor Strike',   dmgType:'magical',stat:'int', dice:[1,22],bonus:0, acc:-1, uses:4,  desc:'Call down a meteor. Maximum variance — devastating or disappointing.' },
-  iceShards:    { name:'Ice Shards',      dmgType:'magical',stat:'int', dice:[2,6], bonus:1, acc:1,  uses:15, desc:'Razor-sharp ice. Lower damage but may slow the target.', effect:'slow' },
-  thornWhip:    { name:'Thorn Whip',      dmgType:'magical',stat:'def', dice:[4,4], bonus:1, acc:1,  uses:20, desc:'Thorny vine lash. Reliable nature damage.' },
-  earthquake:   { name:'Earthquake',      dmgType:'magical',stat:'def', dice:[1,20],bonus:1, acc:-1, uses:5,  desc:'Shake the ground. Huge variance in impact.' },
-  naturesWrath: { name:"Nature's Wrath",  dmgType:'magical',stat:'def', dice:[2,8], bonus:2, acc:0,  uses:12, desc:'Channel nature fury. Moderate variance, solid damage.' },
-  // DIVINE — Same balance: consistent vs swingy, with effects costing damage.
-  sacredFlame:  { name:'Sacred Flame',    dmgType:'soul',   stat:'def', dice:[4,4], bonus:1, acc:1,  uses:20, desc:'Steady beam of holy light. Consistent divine damage.' },
-  guidingBolt:  { name:'Guiding Bolt',    dmgType:'soul',   stat:'def', dice:[2,10],bonus:0, acc:1,  uses:10, desc:'Brilliant divine bolt. Good accuracy but high variance.' },
-  judgment:     { name:'Divine Judgment',  dmgType:'soul',   stat:'def', dice:[1,22],bonus:0, acc:-1, uses:4,  desc:'Heavenly wrath. Maximum variance — glorious or disappointing.' },
-  smite:        { name:'Divine Smite',    dmgType:'soul',   stat:'atk', dice:[2,8], bonus:2, acc:0,  uses:10, desc:'Channel divine power through your blade. Moderate variance.' },
-  holyNova:     { name:'Holy Nova',       dmgType:'soul',   stat:'def', dice:[1,18],bonus:2, acc:0,  uses:6,  desc:'Explosion of sacred energy. High variance burst.' },
-  moonfire:     { name:'Moonfire',        dmgType:'soul',   stat:'def', dice:[3,5], bonus:2, acc:0,  uses:16, desc:'Burn with moonlight. Moderate consistency.' },
-  // CURSE — Drain/poison trade damage for utility. Pure damage follows same avg.
-  shadowBolt:   { name:'Shadow Bolt',     dmgType:'soul',    stat:'int', dice:[4,4], bonus:1, acc:1,  uses:20, desc:'Bolt of dark energy. Reliable curse damage.' },
-  lifeDrain:    { name:'Life Drain',      dmgType:'soul',    stat:'cha', dice:[2,6], bonus:2, acc:0,  uses:12, desc:'Siphon vitality. Lower damage but heals for half dealt.', drain:0.5 },
-  deathCoil:    { name:'Death Coil',      dmgType:'soul',    stat:'cha', dice:[1,20],bonus:1, acc:-1, uses:5,  desc:'Coil of death magic. Extreme variance.' },
-  hexBolt:      { name:'Hex Bolt',        dmgType:'soul',    stat:'cha', dice:[2,6], bonus:1, acc:0,  uses:15, desc:'Cursed projectile. Lower damage but may poison.', effect:'poison' },
-  poisonBlade:  { name:'Poisoned Blade',  dmgType:'soul',    stat:'spd', dice:[2,6], bonus:1, acc:1,  uses:15, desc:'Envenomed weapon. Lower damage but may poison.', effect:'poison' },
-  eldritchBlast:{ name:'Eldritch Blast',  dmgType:'soul',    stat:'cha', dice:[2,10],bonus:0, acc:0,  uses:10, desc:'Crackling dark energy. Same average, higher variance.' },
-  darkNova:     { name:'Dark Nova',       dmgType:'soul',    stat:'cha', dice:[1,22],bonus:0, acc:-1, uses:4,  desc:'Catastrophic dark energy. Maximum variance.' },
-  // HEALS — ~11 avg before stat mod.
-  layOnHands:   { name:'Lay on Hands',   dmgType:'heal', stat:'cha', dice:[3,5], bonus:2, acc:99, uses:4, desc:'Channel divine healing through touch.', heal:true },
-  cureWounds:   { name:'Cure Wounds',    dmgType:'heal', stat:'def', dice:[3,5], bonus:2, acc:99, uses:5, desc:'Mend wounds with healing magic.', heal:true },
-  secondWind:   { name:'Second Wind',    dmgType:'heal', stat:'con', dice:[1,12],bonus:5, acc:99, uses:3, desc:'Rally through sheer willpower. Swingy heal.', heal:true },
-  herbalRemedy: { name:'Herbal Remedy',  dmgType:'heal', stat:'def', dice:[2,6], bonus:4, acc:99, uses:4, desc:'Apply soothing healing herbs.', heal:true },
-  meditation:   { name:'Meditation',     dmgType:'heal', stat:'def', dice:[2,8], bonus:2, acc:99, uses:4, desc:'Focus inner energy to heal.', heal:true },
-  darkPact:     { name:'Dark Pact',      dmgType:'heal', stat:'cha', dice:[2,6], bonus:4, acc:99, uses:4, desc:'Sacrifice dark energy to restore health.', heal:true },
-  rejuvenation: { name:'Rejuvenation',   dmgType:'heal', stat:'def', dice:[4,3], bonus:3, acc:99, uses:5, desc:'Nature\'s restorative power. Very consistent.', heal:true },
-  manaShield:   { name:'Mana Shield',    dmgType:'heal', stat:'int', dice:[2,8], bonus:2, acc:99, uses:4, desc:'Convert magical energy into healing.', heal:true },
+  // DAMAGE FORMAT: fixed + NdX. Fixed = 40-80% of expected damage. No bonus field.
+  // Low variance (80% fixed): consistent, reliable moves
+  // Medium variance (60% fixed): balanced risk/reward
+  // High variance (40% fixed): swingy, feast-or-famine
+  // PHYSICAL
+  swordSlash:   { name:'Sword Slash',     dmgType:'physical', stat:'atk', fixed:9,  dice:[1,4],  acc:1,  uses:20, desc:'Reliable quick slashes. Very consistent damage output.' },
+  shieldBash:   { name:'Shield Bash',     dmgType:'physical', stat:'atk', fixed:5,  dice:[1,6],  acc:0,  uses:14, desc:'Heavy shield strike. Lower damage but may stun the target.', effect:'stun' },
+  execute:      { name:'Execute',         dmgType:'physical', stat:'atk', fixed:5,  dice:[2,6],  acc:-1, uses:5,  desc:'Devastating finishing blow. High risk, high reward.' },
+  cleave:       { name:'Cleave',          dmgType:'physical', stat:'atk', fixed:4,  dice:[2,6],  acc:0,  uses:10, desc:'Wide sweeping slash. High variance — big hits or weak swings.' },
+  quickStrike:  { name:'Quick Strike',    dmgType:'physical', stat:'spd', fixed:9,  dice:[1,4],  acc:2,  uses:22, desc:'Rapid precise jabs. Extremely consistent and hard to dodge.' },
+  backstab:     { name:'Backstab',        dmgType:'physical', stat:'spd', fixed:5,  dice:[2,6],  acc:0,  uses:8,  desc:'Strike from shadows. High variance — massive hit or barely a scratch.' },
+  ragingBlow:   { name:'Raging Blow',     dmgType:'physical', stat:'atk', fixed:4,  dice:[2,8],  acc:-1, uses:5,  desc:'Berserk overhand strike. Maximum variance — true feast or famine.' },
+  flurry:       { name:'Flurry of Blows', dmgType:'physical', stat:'spd', fixed:9,  dice:[1,4],  acc:1,  uses:20, desc:'Rapid combination strikes. Very consistent and reliable.' },
+  crossbow:     { name:'Crossbow Shot',   dmgType:'physical', stat:'spd', fixed:7,  dice:[1,8],  acc:1,  uses:15, desc:'Precise ranged bolt. Moderate variance, good accuracy.' },
+  // MAGICAL
+  arcaneBolt:   { name:'Arcane Bolt',     dmgType:'magical',  stat:'int', fixed:9,  dice:[1,4],  acc:1,  uses:20, desc:'Focused arcane energy. Consistent and reliable.' },
+  arcaneBarrage:{ name:'Arcane Barrage',  dmgType:'magical',  stat:'int', fixed:7,  dice:[1,8],  acc:0,  uses:10, desc:'Volley of magical projectiles. Moderate variance.' },
+  disintegrate: { name:'Disintegrate',    dmgType:'magical',  stat:'int', fixed:5,  dice:[2,6],  acc:-1, uses:4,  desc:'Beam of pure destruction. Can obliterate or fizzle.' },
+  arcaneMissile:{ name:'Arcane Missiles', dmgType:'magical',  stat:'int', fixed:7,  dice:[1,4],  acc:99, uses:15, desc:'Unerring bolts. Always hits, always consistent. Lower damage for guaranteed value.' },
+  chaosBolt:    { name:'Chaos Bolt',      dmgType:'magical',  stat:'cha', fixed:5,  dice:[2,6],  acc:0,  uses:8,  desc:'Unstable magical energy. High variance chaotic damage.' },
+  kiBlast:      { name:'Ki Blast',        dmgType:'magical',  stat:'def', fixed:7,  dice:[1,8],  acc:0,  uses:16, desc:'Focused spiritual energy. Moderate variance.' },
+  fireBolt:     { name:'Fire Bolt',       dmgType:'magical',  stat:'int', fixed:9,  dice:[1,4],  acc:1,  uses:20, desc:'Small bolt of flame. Consistent elemental damage.' },
+  lightning:    { name:'Lightning Strike', dmgType:'magical',  stat:'int', fixed:7,  dice:[1,8],  acc:0,  uses:10, desc:'Crackling bolt. Moderate variance, same average.' },
+  meteor:       { name:'Meteor Strike',   dmgType:'magical',  stat:'int', fixed:5,  dice:[2,6],  acc:-1, uses:4,  desc:'Call down a meteor. High variance — devastating or disappointing.' },
+  iceShards:    { name:'Ice Shards',      dmgType:'magical',  stat:'int', fixed:5,  dice:[1,6],  acc:1,  uses:15, desc:'Razor-sharp ice. Lower damage but may slow the target.', effect:'slow' },
+  thornWhip:    { name:'Thorn Whip',      dmgType:'magical',  stat:'def', fixed:9,  dice:[1,4],  acc:1,  uses:20, desc:'Thorny vine lash. Reliable nature damage.' },
+  earthquake:   { name:'Earthquake',      dmgType:'magical',  stat:'def', fixed:5,  dice:[2,6],  acc:-1, uses:5,  desc:'Shake the ground. High variance in impact.' },
+  naturesWrath: { name:"Nature's Wrath",  dmgType:'magical',  stat:'def', fixed:7,  dice:[1,8],  acc:0,  uses:12, desc:'Channel nature fury. Moderate variance, solid damage.' },
+  // SOUL
+  sacredFlame:  { name:'Sacred Flame',    dmgType:'soul',     stat:'def', fixed:9,  dice:[1,4],  acc:1,  uses:20, desc:'Steady beam of holy light. Consistent divine damage.' },
+  guidingBolt:  { name:'Guiding Bolt',    dmgType:'soul',     stat:'def', fixed:7,  dice:[1,8],  acc:1,  uses:10, desc:'Brilliant divine bolt. Good accuracy, moderate variance.' },
+  judgment:     { name:'Divine Judgment',  dmgType:'soul',     stat:'def', fixed:5,  dice:[2,6],  acc:-1, uses:4,  desc:'Heavenly wrath. High variance — glorious or disappointing.' },
+  smite:        { name:'Divine Smite',    dmgType:'soul',     stat:'atk', fixed:7,  dice:[1,8],  acc:0,  uses:10, desc:'Channel divine power through your blade. Moderate variance.' },
+  holyNova:     { name:'Holy Nova',       dmgType:'soul',     stat:'def', fixed:5,  dice:[2,6],  acc:0,  uses:6,  desc:'Explosion of sacred energy. High variance burst.' },
+  moonfire:     { name:'Moonfire',        dmgType:'soul',     stat:'def', fixed:7,  dice:[1,8],  acc:0,  uses:16, desc:'Burn with moonlight. Moderate consistency.' },
+  shadowBolt:   { name:'Shadow Bolt',     dmgType:'soul',     stat:'int', fixed:9,  dice:[1,4],  acc:1,  uses:20, desc:'Bolt of dark energy. Reliable curse damage.' },
+  lifeDrain:    { name:'Life Drain',      dmgType:'soul',     stat:'cha', fixed:5,  dice:[1,8],  acc:0,  uses:12, desc:'Siphon vitality. Lower damage but heals for half dealt.', drain:0.5 },
+  deathCoil:    { name:'Death Coil',      dmgType:'soul',     stat:'cha', fixed:5,  dice:[2,6],  acc:-1, uses:5,  desc:'Coil of death magic. High variance.' },
+  hexBolt:      { name:'Hex Bolt',        dmgType:'soul',     stat:'cha', fixed:5,  dice:[1,6],  acc:0,  uses:15, desc:'Cursed projectile. Lower damage but may poison.', effect:'poison' },
+  poisonBlade:  { name:'Poisoned Blade',  dmgType:'soul',     stat:'spd', fixed:5,  dice:[1,6],  acc:1,  uses:15, desc:'Envenomed weapon. Lower damage but may poison.', effect:'poison' },
+  eldritchBlast:{ name:'Eldritch Blast',  dmgType:'soul',     stat:'cha', fixed:7,  dice:[1,8],  acc:0,  uses:10, desc:'Crackling dark energy. Moderate variance.' },
+  darkNova:     { name:'Dark Nova',       dmgType:'soul',     stat:'cha', fixed:5,  dice:[2,6],  acc:-1, uses:4,  desc:'Catastrophic dark energy. High variance.' },
+  // HEALS — fixed + dice, same system
+  layOnHands:   { name:'Lay on Hands',   dmgType:'heal', stat:'cha', fixed:8,  dice:[1,6],  acc:99, uses:4, desc:'Channel divine healing through touch.', heal:true },
+  cureWounds:   { name:'Cure Wounds',    dmgType:'heal', stat:'def', fixed:8,  dice:[1,6],  acc:99, uses:5, desc:'Mend wounds with healing magic.', heal:true },
+  secondWind:   { name:'Second Wind',    dmgType:'heal', stat:'con', fixed:5,  dice:[2,6],  acc:99, uses:3, desc:'Rally through sheer willpower. Swingy heal.', heal:true },
+  herbalRemedy: { name:'Herbal Remedy',  dmgType:'heal', stat:'def', fixed:8,  dice:[1,4],  acc:99, uses:4, desc:'Apply soothing healing herbs.', heal:true },
+  meditation:   { name:'Meditation',     dmgType:'heal', stat:'def', fixed:7,  dice:[1,8],  acc:99, uses:4, desc:'Focus inner energy to heal.', heal:true },
+  darkPact:     { name:'Dark Pact',      dmgType:'heal', stat:'cha', fixed:8,  dice:[1,4],  acc:99, uses:4, desc:'Sacrifice dark energy to restore health.', heal:true },
+  rejuvenation: { name:'Rejuvenation',   dmgType:'heal', stat:'def', fixed:9,  dice:[1,4],  acc:99, uses:5, desc:'Nature\'s restorative power. Very consistent.', heal:true },
+  manaShield:   { name:'Mana Shield',    dmgType:'heal', stat:'int', fixed:7,  dice:[1,8],  acc:99, uses:4, desc:'Convert magical energy into healing.', heal:true },
   // LICH ABILITIES
-  lichBlast:    { name:'Lich Blast',      dmgType:'magical',  stat:'int', dice:[3,6], bonus:2, acc:0,  uses:14, desc:'Concentrated necrotic-arcane blast. High damage with a chance to freeze.', freezeChance:0.2 },
-  glaciate:     { name:'Glaciate',        dmgType:'magical',  stat:'int', dice:[2,4], bonus:1, acc:1,  uses:16, desc:'Wave of absolute cold. Low damage but very high freeze chance.', freezeChance:0.6 },
-  lichLifeDrain:{ name:'Life Drain',      dmgType:'magical',  stat:'int', dice:[2,8], bonus:1, acc:0,  uses:10, desc:'Siphon life force from the target. Heals proportion of damage dealt.', drain:0.5 },
-  shatter:      { name:'Shatter',         dmgType:'physical', stat:'int', dice:[4,8], bonus:4, acc:1,  uses:6,  desc:'Shatter a frozen target into pieces. ONLY works on frozen enemies.', requiresFrozen:true },
+  lichBlast:    { name:'Lich Blast',      dmgType:'magical',  stat:'int', fixed:8,  dice:[2,6],  acc:0,  uses:14, desc:'Concentrated necrotic-arcane blast. High damage with a chance to freeze.', freezeChance:0.2 },
+  glaciate:     { name:'Glaciate',        dmgType:'magical',  stat:'int', fixed:5,  dice:[1,4],  acc:1,  uses:16, desc:'Wave of absolute cold. Low damage but very high freeze chance.', freezeChance:0.6 },
+  lichLifeDrain:{ name:'Life Drain',      dmgType:'magical',  stat:'int', fixed:7,  dice:[1,8],  acc:0,  uses:10, desc:'Siphon life force from the target. Heals proportion of damage dealt.', drain:0.5 },
+  shatter:      { name:'Shatter',         dmgType:'physical', stat:'int', fixed:16, dice:[2,8],  acc:1,  uses:6,  desc:'Shatter a frozen target into pieces. ONLY works on frozen enemies.', requiresFrozen:true },
 };
 
 // ============================================================
@@ -615,12 +617,12 @@ function attackRoll(attacker, ability, defenderDEF) {
 
 function rollHealForAbility(attacker, ability) {
   const [count, sides] = ability.dice;
-  return Math.max(1, rollDice(count, sides) + ability.bonus + mod(attacker.stats[ability.stat]));
+  return Math.max(1, (ability.fixed || 0) + rollDice(count, sides) + mod(attacker.stats[ability.stat]));
 }
 
 function rollDamageForAbility(attacker, defender, ability) {
   const [count, sides] = ability.dice;
-  const baseDmg = rollDice(count, sides) + ability.bonus;
+  const baseDmg = (ability.fixed || 0) + rollDice(count, sides);
   // Physical: ATK vs DEF, Magical: INT vs INT, Soul: no scaling (raw dice only)
   if (ability.dmgType === 'soul') {
     return { damage: Math.max(1, baseDmg), baseDmg, atkRoll: 0, defRoll: 0, multiplier: 1.0 };
@@ -747,24 +749,23 @@ function renderRoster(who) {
 // ============================================================
 function calcMoveStats(ability, attacker) {
   const [count, sides] = ability.dice;
-  let totalBonus, minBase, maxBase, avgBase, atkStat, minDmg, maxDmg, avgDmg;
+  const fixed = ability.fixed || 0;
+  let minBase, maxBase, avgBase, atkStat, minDmg, maxDmg, avgDmg;
   if (ability.heal) {
-    // Heals use old formula: dice + bonus + stat mod
     const statMod = mod(attacker.stats[ability.stat]);
-    totalBonus = ability.bonus + statMod;
-    minBase = count + totalBonus;
-    maxBase = count * sides + totalBonus;
-    avgBase = count * (sides + 1) / 2 + totalBonus;
+    minBase = fixed + count + statMod;
+    maxBase = fixed + count * sides + statMod;
+    avgBase = fixed + count * (sides + 1) / 2 + statMod;
     atkStat = attacker.stats[ability.stat];
     minDmg = Math.max(1, minBase);
     maxDmg = maxBase;
     avgDmg = avgBase;
   } else {
-    totalBonus = ability.bonus;
-    minBase = count + totalBonus;
-    maxBase = count * sides + totalBonus;
-    avgBase = count * (sides + 1) / 2 + totalBonus;
+    minBase = fixed + count;
+    maxBase = fixed + count * sides;
+    avgBase = fixed + count * (sides + 1) / 2;
     atkStat = ability.dmgType === 'physical' ? attacker.stats.atk : attacker.stats.int;
+    // ATK/DEF multiplier range: ~0.5x to ~1.5x
     minDmg = Math.max(1, Math.floor(minBase * 0.5));
     maxDmg = Math.ceil(maxBase * 1.5);
     avgDmg = avgBase;
@@ -777,14 +778,15 @@ function calcMoveStats(ability, attacker) {
   else if (cv < 0.35) { varLabel = 'Medium (Moderate)'; varClass = 'med'; }
   else if (cv < 0.48) { varLabel = 'High (Volatile)'; varClass = 'high'; }
   else { varLabel = 'Extreme (Chaotic)'; varClass = 'extreme'; }
-  return { minDmg, maxDmg, avgDmg: avgDmg.toFixed(1), varLabel, varClass, totalBonus, stdDev, atkStat };
+  return { minDmg, maxDmg, avgDmg: avgDmg.toFixed(1), varLabel, varClass, stdDev, atkStat, fixed };
 }
 
 function showTooltip(btn, ability) {
   const p = player();
   const o = opponent();
   const s = calcMoveStats(ability, p);
-  const diceStr = `${ability.dice[0]}d${ability.dice[1]}${s.totalBonus > 0 ? '+' + s.totalBonus : s.totalBonus < 0 ? s.totalBonus : ''}`;
+  const fixed = ability.fixed || 0;
+  const diceStr = fixed > 0 ? `${fixed}+${ability.dice[0]}d${ability.dice[1]}` : `${ability.dice[0]}d${ability.dice[1]}`;
   const typeLabel = TYPE_LABELS[ability.dmgType] || ability.dmgType;
   const typeIcon = TYPE_ICONS[ability.dmgType] || '';
 
@@ -839,8 +841,8 @@ function renderMoves() {
     const btn = document.createElement('button');
     btn.className = 'move-btn';
     btn.dataset.dmg = ab.dmgType;
-    const s = calcMoveStats(ab, p);
-    const diceStr = `${ab.dice[0]}d${ab.dice[1]}${s.totalBonus>0?'+'+s.totalBonus:s.totalBonus<0?s.totalBonus:''}`;
+    const fixed = ab.fixed || 0;
+    const diceStr = fixed > 0 ? `${fixed}+${ab.dice[0]}d${ab.dice[1]}` : `${ab.dice[0]}d${ab.dice[1]}`;
     const tag = ab.heal ? 'HEAL' : ab.dmgType.toUpperCase();
     let effHint = '';
     const scaleInfo = ab.heal ? ab.stat.toUpperCase() : (ab.dmgType === 'soul' ? '—' : ab.dmgType === 'physical' ? 'ATK' : 'INT');
@@ -1304,11 +1306,10 @@ function pickAIAbility() {
   o.abilities.forEach((ab, i) => {
     if (ab.currentUses <= 0 || ab.heal) return;
     if (ab.requiresFrozen && player().status !== 'frozen') return;
-    const statMod = mod(o.stats[ab.stat]);
-    const avgDmg = ab.dice[0] * (ab.dice[1] + 1) / 2 + ab.bonus + statMod;
+    const avgDmg = (ab.fixed || 0) + ab.dice[0] * (ab.dice[1] + 1) / 2;
     const mult = 1;
     let score = avgDmg * mult * (0.8 + Math.random() * 0.4);
-    if (ab.requiresFrozen && player().status === 'frozen') score *= 2; // prioritize shatter
+    if (ab.requiresFrozen && player().status === 'frozen') score *= 2;
     if (score > bestScore) { bestScore = score; best = i; }
   });
   if (best === -1) best = o.abilities.findIndex(a => a.currentUses > 0) || 0;
@@ -1325,8 +1326,7 @@ function pickSmartMove() {
   p.abilities.forEach((ab, i) => {
     if (ab.currentUses <= 0 || ab.heal) return;
     if (ab.requiresFrozen && opponent().status !== 'frozen') return;
-    const statMod = mod(p.stats[ab.stat]);
-    const avgDmg = ab.dice[0] * (ab.dice[1] + 1) / 2 + ab.bonus + statMod;
+    const avgDmg = (ab.fixed || 0) + ab.dice[0] * (ab.dice[1] + 1) / 2;
     const mult = 1;
     let score = avgDmg * mult * (0.85 + Math.random() * 0.3);
     if (ab.requiresFrozen && opponent().status === 'frozen') score *= 2;
