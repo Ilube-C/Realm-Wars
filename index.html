@@ -184,18 +184,11 @@ body {
 .stance-indicator { font-size: 9px; color: #8ab; margin-left: 6px; font-style: italic; }
 
 /* Stance Info Panels */
-.stance-info-panel {
-  position: absolute; z-index: 12;
-  background: rgba(20,18,12,0.92); border: 1px solid #3a3020;
-  border-radius: 5px; padding: 6px 8px; font-size: 9px;
-  max-width: 220px; pointer-events: none;
-}
-.stance-info-panel.player-stance { bottom: 2px; right: 15px; }
-.stance-info-panel.opp-stance { top: 2px; left: 15px; }
-.stance-info-panel .stance-label { color: #8ab; font-weight: 700; font-size: 10px; }
-.stance-info-panel .stance-name-text { color: #e8d8b0; font-weight: 600; }
-.stance-info-panel .stance-desc-text { color: #9a8a6a; font-style: italic; margin-top: 2px; }
-.stance-info-panel .stance-none { color: #5a5040; font-style: italic; }
+.stance-info-panel { display: none; }
+.stance-inline { font-size: 9px; margin-top: 3px; padding: 2px 5px; background: #1a1208; border-radius: 3px; }
+.stance-inline .stance-label { color: #8ab; font-weight: 700; }
+.stance-inline .stance-name-text { color: #e8d8b0; font-weight: 600; }
+.stance-inline .stance-desc-text { color: #9a8a6a; font-style: italic; }
 
 /* Bottom Panel */
 #bottom-panel { height: 240px; display: flex; background: #12100c; border-top: 2px solid #3a2a1a; }
@@ -704,27 +697,18 @@ function renderActiveInfo(who) {
   const s = b.stats;
   document.getElementById(prefix + '-stats').innerHTML =
     `<span>ATK ${s.atk}</span><span>DEF ${s.def}</span><span>CON ${s.con}</span><span>INT ${s.int}</span><span>CHA ${s.cha}</span><span>SPD ${s.spd}</span>`;
+  // Render stance inline inside HP box
+  let stanceEl = document.getElementById(prefix + '-stance');
+  if (!stanceEl) {
+    stanceEl = document.createElement('div');
+    stanceEl.id = prefix + '-stance';
+    stanceEl.className = 'stance-inline';
+    document.querySelector('.hp-box.' + (who === 'player' ? 'player' : 'opponent')).appendChild(stanceEl);
+  }
+  if (b.stance) stanceEl.innerHTML = `<span class="stance-label">Stance:</span> <span class="stance-name-text">${b.stance.name}</span> <span class="stance-desc-text">— ${b.stance.desc}</span>`;
+  else stanceEl.innerHTML = `<span class="stance-label">Stance:</span> <span style="color:#5a5040;font-style:italic">None</span>`;
   document.getElementById(prefix + '-types').innerHTML = '';
-  // Render stance info panel below HP for both combatants
-  renderStanceInfo();
   updateHpBar(who);
-}
-
-function renderStanceInfo() {
-  const p = player(), o = opponent();
-  const pEl = document.getElementById('player-stance-info');
-  const oEl = document.getElementById('opp-stance-info');
-  if (!p || !o) return;
-  // Player stance panel: shows YOUR stance + opponent's stance
-  let pHtml = '';
-  if (p.stance) pHtml += `<div><span class="stance-label">Your Stance:</span> <span class="stance-name-text">${p.stance.name}</span><div class="stance-desc-text">${p.stance.desc}</div></div>`;
-  else pHtml += `<div><span class="stance-label">Your Stance:</span> <span class="stance-none">None</span></div>`;
-  if (o.stance) pHtml += `<div style="margin-top:3px"><span class="stance-label" style="color:#c86">Enemy Stance:</span> <span class="stance-name-text">${o.stance.name}</span><div class="stance-desc-text">${o.stance.desc}</div></div>`;
-  else pHtml += `<div style="margin-top:3px"><span class="stance-label" style="color:#c86">Enemy Stance:</span> <span class="stance-none">None</span></div>`;
-  pEl.innerHTML = pHtml;
-  // Opponent panel: compact
-  if (o.stance) oEl.innerHTML = `<span class="stance-label">${o.name}:</span> <span class="stance-name-text">${o.stance.name}</span>`;
-  else oEl.innerHTML = '';
 }
 
 function renderSprite(who) {
@@ -941,8 +925,7 @@ async function startBattle() {
 
   // Apply stances for AI team members with stances
   oppTeam.forEach(b => { if (b.stances) { applyStance(b, aiPickStance(b)); } });
-  // Apply stances for non-active player team members (AI picks)
-  playerTeam.forEach((b, i) => { if (b.stances && i !== 0) { applyStance(b, aiPickStance(b)); } });
+  // Player team members get stance on switch-in (not pre-applied)
 
   renderActiveInfo('player'); renderActiveInfo('opponent');
   renderSprite('player'); renderSprite('opponent');
