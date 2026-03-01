@@ -1386,7 +1386,7 @@ async function executeAbility(attacker, defender, ability) {
 
     // Blind application from Radial Strike
     if (hitAbility.blindChance && !defender.fainted && defender.currentHp > 0) {
-      if (Math.random() < hitAbility.blindChance) {
+      if (Math.random() < hitAbility.blindChance + (attacker.stats.cha / 200)) {
         defender.blindStacks++;
         log(`  ${defName} is blinded! (${defender.blindStacks} stack${defender.blindStacks>1?'s':''}, ${defender.blindStacks*15}% miss)`, 'status');
         updateHpBar(!isPlayer ? 'player' : 'opponent');
@@ -1395,7 +1395,8 @@ async function executeAbility(attacker, defender, ability) {
 
     // Battlefield Star: small chance to blind each hit
     if (attacker.stance && attacker.stance.passive === 'blindPerTurn' && !defender.fainted && defender.currentHp > 0) {
-      if (Math.random() < 0.15) {
+      const bsBlindChance = 0.15 + (attacker.stats.cha / 200);
+      if (Math.random() < bsBlindChance) {
         defender.blindStacks++;
         log(`  Battlefield Star! ${defName} is dazzled! (${defender.blindStacks} blind stack${defender.blindStacks>1?'s':''})`, 'status');
         updateHpBar(!isPlayer ? 'player' : 'opponent');
