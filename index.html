@@ -1131,6 +1131,13 @@ async function executeAbility(attacker, defender, ability) {
   log(`  ${defName} takes ${dmg} ${ability.dmgType} damage!`, 'damage');
   renderRoster(!isPlayer ? 'player' : 'opponent');
 
+  // Shatter unfreezes after dealing bonus damage
+  if (ability.requiresFrozen && defender.status === 'frozen') {
+    defender.status = null; defender.statusTurns = 0;
+    log(`  ${defName} shatters free from the ice!`, 'status');
+    updateHpBar(!isPlayer ? 'player' : 'opponent');
+  }
+
   if (ability.drain) {
     const healAmt = Math.floor(dmg * ability.drain);
     attacker.currentHp = Math.min(attacker.maxHp, attacker.currentHp + healAmt);
