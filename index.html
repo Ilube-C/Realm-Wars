@@ -436,7 +436,7 @@ const ABILITIES = {
   heavenlyBlow: { name:'Heavenly Blow',  dmgType:'physical', stat:'atk', fixed:8,  dice:[1,8],  acc:0,  uses:10, desc:'Half physical, half magical damage. Hits both defences.', splitDamage:true },
   healingPrayer:{ name:'Healing Prayer', dmgType:'heal',     stat:'cha', fixed:0,  dice:[1,1],  acc:99, uses:4,  desc:'Pray for healing. At end of NEXT turn, your active unit heals and is cured of all statuses.', healingPrayer:true, heal:true },
   // REX RANG ABILITIES
-  battlerang:   { name:'Battlerang',     dmgType:'physical', stat:'atk', fixed:8,  dice:[1,6],  acc:0,  uses:14, desc:'Medium physical damage. Boomerangs back — hits again at end of next turn.', boomerang:true },
+  battlerang:   { name:'Battlerang',     dmgType:'physical', stat:'atk', fixed:8,  dice:[1,6],  acc:0,  uses:14, desc:'Medium physical damage. Boomerangs back — hits again at end of next turn. Chance to flinch (target loses action).', boomerang:true, flinchChance:0.25 },
   emberang:     { name:'Emberang',       dmgType:'physical', stat:'atk', fixed:5,  dice:[1,6],  acc:0,  uses:12, desc:'Less damage than Battlerang but chance to burn. Hits again at end of next turn.', boomerang:true, burnChance:0.35 },
   whittle:      { name:'Whittle',        dmgType:'physical', stat:'atk', fixed:4,  dice:[1,4],  acc:99, uses:4,  desc:'Sharpen your edge. Grants +4 ATK until you switch out.', grantWhittle:true },
   swerve:       { name:'Swerve',         dmgType:'physical', stat:'atk', fixed:0,  dice:[1,1],  acc:99, uses:10, desc:'Act fast and dodge. High chance to evade enemy attacks this turn. Much less effective if used consecutively.', swerve:true },
@@ -532,8 +532,8 @@ const CLASSES = [
     stances: [
       { id:'patientKiller', name:'Patient Killer', desc:'ATK+2. Second hit of Battlerang/Emberang deals bonus damage.',
         statBoosts:{atk:2}, passive:'boomerangBonus' },
-      { id:'guerillaFighter', name:'Guerilla Fighter', desc:'SPD+2. After an enemy attack misses due to Swerve, switch out.',
-        statBoosts:{spd:2}, passive:'guerillaSwitchOut' },
+      { id:'guerillaFighter', name:'Guerilla Fighter', desc:'SPD+2. On switch-in, throws a 30% power Battlerang. After dodging with Swerve, switch out.',
+        statBoosts:{spd:2}, passive:'guerillaSwitchOut', guerillaEntry:true },
     ]},
 ];
 
@@ -675,7 +675,7 @@ function createCombatant(cls, level) {
     stance: null, stances: cls.stances || null,
     switchLocked: false, deathLustTurns: 0, damagedThisTurn: false,
     blindStacks: 0, healingPrayerPending: false, makeWaySwitch: false, defBonusThisTurn: 0,
-    boomerangHits: [], burnStacks: 0, swerveActive: false, swerveLastTurn: false, whittleBoost: 0,
+    boomerangHits: [], burnStacks: 0, swerveActive: false, swerveLastTurn: false, whittleBoost: 0, flinched: false,
   };
 }
 
@@ -759,6 +759,7 @@ function renderStatusEffects(b) {
   if (b.healingPrayerPending) html += `<span class="status-effect-tag" style="background:#2a4a2a;color:#8c8">🙏 PRAYER PENDING</span>`;
   if (b.burnStacks > 0) html += `<span class="status-effect-tag" style="background:#4a2a0a;color:#f84">🔥 BURN ×${b.burnStacks}</span>`;
   if (b.boomerangHits.length > 0) html += `<span class="status-effect-tag" style="background:#3a3a1a;color:#cc8">🪃 RANG INCOMING (${b.boomerangHits.length})</span>`;
+  if (b.flinched) html += `<span class="status-effect-tag" style="background:#4a3a1a;color:#ea8">😵 FLINCHED</span>`;
   if (b.swerveActive) html += `<span class="status-effect-tag" style="background:#1a3a2a;color:#8c8">💨 SWERVING</span>`;
   if (b.whittleBoost > 0) html += `<span class="status-effect-tag" style="background:#3a2a1a;color:#ca8">🔪 WHETTED (+${b.whittleBoost} ATK)</span>`;
   return html ? `<div class="status-effects-row">${html}</div>` : '';
@@ -970,6 +971,39 @@ function applyStance(combatant, stance) {
       updateHpBar(!isPlayer ? 'player' : 'opponent');
     }
   }
+  // Guerilla Fighter: throw a 30% power Battlerang on switch-in
+  if (stance.guerillaEntry) {
+    const isPlayer = playerTeam.includes(combatant);
+    const target = isPlayer ? opponent() : player();
+    if (target && !target.fainted) {
+      const baseFixed = ABILITIES.battlerang.fixed;
+      const entryFixed = Math.max(1, Math.floor(baseFixed * 0.3));
+      const entryDice = [1, 3]; // reduced dice too
+      // Calculate damage using physical formula
+      const atkStat = combatant.stats.atk;
+      const defStat = target.stats.def;
+      const baseDmg = entryFixed + Math.floor(Math.random() * entryDice[1]) + 1;
+      const atkRoll = rollDice(2, 6) + atkStat;
+      const defRoll = rollDice(2, 6) + defStat;
+      const multiplier = 0.5 + 0.5 * (atkRoll / Math.max(1, defRoll));
+      const dmg = Math.max(1, Math.round(baseDmg * multiplier));
+      target.currentHp = Math.max(0, target.currentHp - dmg);
+      target.damagedThisTurn = true;
+      log(`Guerilla Fighter! ${combatant.name} throws a quick rang on entry for ${dmg} damage!`, 'damage');
+      updateHpBar(!isPlayer ? 'player' : 'opponent');
+      showDmgFloat(!isPlayer ? 'player' : 'opponent', dmg, false, false);
+      renderRoster(!isPlayer ? 'player' : 'opponent');
+      // Frozen thaw
+      if (target.status === 'frozen') {
+        target.status = null; target.statusTurns = 0;
+        log(`  ${target.name} thaws from the impact!`, 'status');
+        updateHpBar(!isPlayer ? 'player' : 'opponent');
+      }
+      if (target.currentHp <= 0 && !target.fainted) {
+        target.fainted = true; animateFaint(target);
+      }
+    }
+  }
 }
 
 function removeStance(combatant) {
@@ -1158,10 +1192,14 @@ async function executeTurn(moveIdx) {
     if (checkWin()) return;
 
     if (!second.fainted && !first.fainted) {
-      await delay(300);
-      await executeAbility(second, first, secondAb);
-      if (first.fainted) await handleFaint(first === p ? 'player' : 'opponent');
-      if (second.fainted) await handleFaint(second === p ? 'player' : 'opponent');
+      if (second.flinched) {
+        log(`${second.name} flinched and can't move!`, 'status');
+      } else {
+        await delay(300);
+        await executeAbility(second, first, secondAb);
+        if (first.fainted) await handleFaint(first === p ? 'player' : 'opponent');
+        if (second.fainted) await handleFaint(second === p ? 'player' : 'opponent');
+      }
     }
 
     if (checkWin()) return;
@@ -1525,6 +1563,15 @@ async function executeAbility(attacker, defender, ability) {
       updateHpBar(!isPlayer ? 'player' : 'opponent');
     }
 
+    // Flinch: chance to make defender skip their action this turn (only on initial hit)
+    if (hitAbility.flinchChance && !defender.fainted && defender.currentHp > 0 && !defender.flinched) {
+      const fChance = hitAbility.flinchChance + (Math.max(0, (attacker.stats.cha - defender.stats.cha)) * 0.02);
+      if (Math.random() < fChance) {
+        defender.flinched = true;
+        log(`  ${defName} flinches! They lose their action this turn!`, 'status');
+      }
+    }
+
     return dmg;
   }
 
@@ -1589,6 +1636,9 @@ async function tickStatus(battler) {
 
   // Clear switch lock at end of turn
   battler.switchLocked = false;
+
+  // Clear flinch
+  battler.flinched = false;
 
   // Swerve: track for consecutive use penalty, then clear
   battler.swerveLastTurn = !!battler.swerveActive;
