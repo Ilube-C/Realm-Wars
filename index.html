@@ -423,6 +423,11 @@ const ABILITIES = {
   glaciate:     { name:'Glaciate',        dmgType:'magical',  stat:'int', fixed:5,  dice:[1,4],  acc:1,  uses:16, desc:'Wave of absolute cold. Low damage but very high freeze chance.', freezeChance:0.6 },
   lichLifeDrain:{ name:'Life Drain',      dmgType:'magical',  stat:'int', fixed:7,  dice:[1,8],  acc:0,  uses:10, desc:'Siphon life force from the target. Heals proportion of damage dealt.', drain:0.5 },
   shatter:      { name:'Shatter',         dmgType:'physical', stat:'int', fixed:16, dice:[2,8],  acc:1,  uses:6,  desc:'Shatter a frozen target into pieces. ONLY works on frozen enemies.', requiresFrozen:true },
+  // PIT DWELLER ABILITIES
+  tumpUp:       { name:'Tump Up',        dmgType:'physical', stat:'atk', fixed:4,  dice:[1,4],  acc:1,  uses:16, desc:'Hits twice. Second hit deals more damage but can miss.', doubleHit:true },
+  counterThrow: { name:'Counter Throw',  dmgType:'physical', stat:'atk', fixed:8,  dice:[2,6],  acc:0,  uses:10, desc:'Act with reduced speed. Deals bonus damage if opponent already hit you this turn.', counterMove:true },
+  subdue:       { name:'Subdue',         dmgType:'physical', stat:'atk', fixed:7,  dice:[1,6],  acc:1,  uses:12, desc:'Pin the opponent down. Prevents them from switching next turn.', lockSwitch:true },
+  deathLust:    { name:'Death Lust',     dmgType:'physical', stat:'atk', fixed:5,  dice:[1,4],  acc:99, uses:4,  desc:'Enter a frenzy. Grants bonus soul damage on all attacks for 2 turns. Lost on switching.', grantDeathLust:true },
 };
 
 // ============================================================
@@ -481,6 +486,15 @@ const CLASSES = [
   { id:'monk', label:'Monk', color:'#aa8844',
     stats:{atk:10,spd:17,con:12,int:10,def:16,cha:8},
     abilities:['flurry','kiBlast','execute','meditation'], sprite:'monk' },
+  { id:'pitDweller', label:'Berserker', fixedName:'Pit Dweller', color:'#8a4422',
+    stats:{atk:17,spd:9,con:16,int:6,def:12,cha:8},
+    abilities:['tumpUp','counterThrow','subdue','deathLust'], sprite:'barbarian',
+    stances: [
+      { id:'dirtyBoxing', name:'Dirty Boxing', desc:'CON+2. Dealing damage has a chance to stun opponent.',
+        statBoosts:{con:2}, passive:'stunOnHit' },
+      { id:'pitVeteran', name:'Pit Veteran', desc:'DEF+2. Small regen at end of each turn.',
+        statBoosts:{def:2}, passive:'regenTick' },
+    ]},
   { id:'lich', label:'Mage', fixedName:'Lich', color:'#44ccdd',
     stats:{atk:6,spd:10,con:12,int:19,def:14,cha:14},
     abilities:['lichBlast','glaciate','lichLifeDrain','shatter'], sprite:'lich',
@@ -602,6 +616,7 @@ function createCombatant(cls, level) {
     abilities: cls.abilities.map(k => ({...ABILITIES[k], key:k, currentUses: ABILITIES[k].uses})),
     status: null, statusTurns: 0, fainted: false,
     stance: null, stances: cls.stances || null,
+    switchLocked: false, deathLustTurns: 0, damagedThisTurn: false,
   };
 }
 
@@ -673,10 +688,15 @@ function log(text, cls='') {
 const STATUS_ICONS = { poison: '☠', stun: '⚡', slow: '🐌', frozen: '❄' };
 
 function renderStatusEffects(b) {
-  if (!b.status) return '';
-  const icon = STATUS_ICONS[b.status] || '';
-  const turnsLeft = b.status === 'frozen' ? '' : ` (${b.statusTurns}t)`;
-  return `<div class="status-effects-row"><span class="status-effect-tag ${b.status}">${icon} ${b.status.toUpperCase()}${turnsLeft}</span></div>`;
+  let html = '';
+  if (b.status) {
+    const icon = STATUS_ICONS[b.status] || '';
+    const turnsLeft = b.status === 'frozen' ? '' : ` (${b.statusTurns}t)`;
+    html += `<span class="status-effect-tag ${b.status}">${icon} ${b.status.toUpperCase()}${turnsLeft}</span>`;
+  }
+  if (b.deathLustTurns > 0) html += `<span class="status-effect-tag" style="background:#4a1a1a;color:#e44">🔥 DEATH LUST (${b.deathLustTurns}t)</span>`;
+  if (b.switchLocked) html += `<span class="status-effect-tag" style="background:#3a2a1a;color:#c86">📌 PINNED</span>`;
+  return html ? `<div class="status-effects-row">${html}</div>` : '';
 }
 
 function updateHpBar(who) {
@@ -730,7 +750,7 @@ function renderRoster(who) {
   team.forEach((b, i) => {
     const entry = document.createElement('div');
     entry.className = 'roster-entry' + (i === activeIdx ? ' active' : '') + (b.fainted ? ' fainted' : '');
-    if (who === 'player' && !b.fainted && i !== activeIdx && !isAnimating) entry.classList.add('switchable');
+    if (who === 'player' && !b.fainted && i !== activeIdx && !isAnimating && !player()?.switchLocked) entry.classList.add('switchable');
     const pct = Math.max(0, b.currentHp / b.maxHp * 100);
     const barCls = pct < 25 ? 'red' : pct < 50 ? 'yellow' : '';
     const statusHtml = b.status ? `<div class="roster-status"><span class="status-effect-tag ${b.status}">${STATUS_ICONS[b.status]||''} ${b.status.toUpperCase()}</span></div>` : '';
@@ -920,9 +940,10 @@ async function startBattle() {
 
   const level = Math.min(20, 5 + Math.floor(battleNum / 3));
   const lichCls = CLASSES.find(c => c.id === 'lich');
-  let available = shuffle(CLASSES.filter(c => c.id !== 'lich'));
-  // Guarantee Lich on player team
-  const playerClasses = [lichCls, ...available.splice(0, 3)];
+  const pitDwellerCls = CLASSES.find(c => c.id === 'pitDweller');
+  let available = shuffle(CLASSES.filter(c => c.id !== 'lich' && c.id !== 'pitDweller'));
+  // Guarantee Lich and Pit Dweller on player team
+  const playerClasses = [lichCls, pitDwellerCls, ...available.splice(0, 2)];
   const oppClasses = available.splice(0, 4);
   playerTeam = shuffle(playerClasses).map(c => createCombatant(c, level));
   oppTeam = oppClasses.map(c => createCombatant(c, level));
@@ -961,9 +982,14 @@ async function promptPlayerStance(combatant) {
 
 async function doSwitch(newIdx) {
   if (isAnimating || playerTeam[newIdx].fainted) return;
+  if (player().switchLocked) {
+    log(`${player().name} is pinned and can't switch!`, 'status');
+    return;
+  }
   isAnimating = true;
   try {
     const oldP = player();
+    oldP.deathLustTurns = 0; // Death Lust lost on switching
     removeStance(oldP);
     playerActive = newIdx;
     // Always clear stance on the incoming character so they get a fresh pick
@@ -1011,7 +1037,16 @@ async function executeTurn(moveIdx) {
     const oppAbIdx = pickAIAbility();
     const oppAb = o.abilities[oppAbIdx]?.currentUses > 0 ? o.abilities[oppAbIdx] : STRUGGLE;
 
-    const pInit = getInitiative(p), oInit = getInitiative(o);
+    // Reset per-turn state
+    p.damagedThisTurn = false;
+    o.damagedThisTurn = false;
+
+    // Counter Throw: user acts with reduced speed
+    let pInit = getInitiative(p);
+    let oInit = getInitiative(o);
+    if (playerAb.counterMove) pInit = Math.floor(pInit * 0.5);
+    if (oppAb.counterMove) oInit = Math.floor(oInit * 0.5);
+
     let first, second, firstAb, secondAb;
     if (pInit >= oInit) { first = p; second = o; firstAb = playerAb; secondAb = oppAb; }
     else { first = o; second = p; firstAb = oppAb; secondAb = playerAb; }
@@ -1095,82 +1130,142 @@ async function executeAbility(attacker, defender, ability) {
     return;
   }
 
+  // Death Lust: grant buff (self-buff move, also deals light damage)
+  if (ability.grantDeathLust) {
+    attacker.deathLustTurns = 2;
+    log(`${atkName} enters Death Lust! Bonus soul damage for 2 turns.`, 'status');
+  }
+
   log(`${atkName} uses ${ability.name}!`);
   const atkSprite = document.getElementById(isPlayer ? 'player-sprite' : 'opp-sprite');
   const defSprite = document.getElementById(isPlayer ? 'opp-sprite' : 'player-sprite');
 
-  atkSprite.classList.add('attacking'); await delay(150); atkSprite.classList.remove('attacking');
-  defSprite.classList.add('hit'); await delay(300); defSprite.classList.remove('hit');
+  // Helper: deal a single hit
+  async function dealHit(hitAbility, label) {
+    atkSprite.classList.add('attacking'); await delay(150); atkSprite.classList.remove('attacking');
+    defSprite.classList.add('hit'); await delay(300); defSprite.classList.remove('hit');
 
-  // New damage formula: (fixed + NdX) × (0.5 + 0.5 × (2d6 + ATK) / (2d6 + DEF))
-  // Physical uses ATK vs DEF, everything else uses INT vs INT
-  const result = rollDamageForAbility(attacker, defender, ability);
-  let dmg = result.damage;
+    const result = rollDamageForAbility(attacker, defender, hitAbility);
+    let dmg = result.damage;
 
-  if (ability.dmgType === 'soul') {
-    log(`  Base: ${result.baseDmg} (soul — no scaling)`, 'roll');
-  } else {
-    const statLabel = ability.dmgType === 'physical' ? 'ATK' : 'INT';
-    const defLabel = ability.dmgType === 'physical' ? 'DEF' : 'INT';
-    log(`  Base: ${result.baseDmg}, Roll: 2d6+${statLabel}=${result.atkRoll} vs 2d6+${defLabel}=${result.defRoll} (×${result.multiplier.toFixed(2)})`, 'roll');
-  }
-
-  // Frozen target takes reduced damage but thaws
-  if (defender.status === 'frozen' && !ability.requiresFrozen) {
-    dmg = Math.max(1, Math.floor(dmg * 0.8));
-    defender.status = null; defender.statusTurns = 0;
-    log(`  ${defName} thaws from the impact! (damage slightly reduced)`, 'status');
-    updateHpBar(!isPlayer ? 'player' : 'opponent');
-  }
-
-  const isBigHit = result.multiplier >= 1.2;
-
-  defender.currentHp = Math.max(0, defender.currentHp - dmg);
-  updateHpBar(!isPlayer ? 'player' : 'opponent');
-  showDmgFloat(!isPlayer ? 'player' : 'opponent', dmg, isBigHit, false);
-  log(`  ${defName} takes ${dmg} ${ability.dmgType} damage!`, 'damage');
-  renderRoster(!isPlayer ? 'player' : 'opponent');
-
-  // Shatter unfreezes after dealing bonus damage
-  if (ability.requiresFrozen && defender.status === 'frozen') {
-    defender.status = null; defender.statusTurns = 0;
-    log(`  ${defName} shatters free from the ice!`, 'status');
-    updateHpBar(!isPlayer ? 'player' : 'opponent');
-  }
-
-  if (ability.drain) {
-    const healAmt = Math.floor(dmg * ability.drain);
-    attacker.currentHp = Math.min(attacker.maxHp, attacker.currentHp + healAmt);
-    updateHpBar(isPlayer ? 'player' : 'opponent');
-    log(`  ${atkName} drains ${healAmt} HP!`, 'heal');
-    renderRoster(isPlayer ? 'player' : 'opponent');
-  }
-
-  if (ability.effect && !defender.status) {
-    const saveDC = 8 + mod(attacker.stats[ability.stat]) + Math.floor(attacker.level/4) + 2;
-    const save = d(20) + mod(defender.stats.def);
-    if (save < saveDC) {
-      const turns = ability.effect === 'stun' ? 1 : 3;
-      defender.status = ability.effect; defender.statusTurns = turns;
-      log(`  ${defName} is ${ability.effect}ed! (DC ${saveDC}, saved ${save})`, 'status');
-    } else {
-      log(`  ${defName} saves vs ${ability.effect}! (DC ${saveDC}, rolled ${save})`, 'roll');
+    // Counter Throw: bonus damage if opponent already hit you this turn
+    if (hitAbility.counterMove && attacker.damagedThisTurn) {
+      const bonus = Math.floor(dmg * 0.5);
+      dmg += bonus;
+      log(`  ${label ? label + ' — ' : ''}Counter! +${bonus} bonus damage!`, 'crit');
     }
-    updateHpBar(!isPlayer ? 'player' : 'opponent');
-  }
 
-  // Freeze chance (from ability or Arctic Aura stance)
-  if (!defender.status && !defender.fainted && defender.currentHp > 0) {
-    let freezeChance = ability.freezeChance || 0;
-    if (attacker.stance && attacker.stance.passive === 'freezeAll') freezeChance += 0.1;
-    if (freezeChance > 0 && Math.random() < freezeChance) {
-      defender.status = 'frozen'; defender.statusTurns = 99;
-      log(`  ${defName} is frozen solid!`, 'status');
+    if (hitAbility.dmgType === 'soul') {
+      log(`  ${label ? label + ': ' : ''}Base: ${result.baseDmg} (soul — no scaling)`, 'roll');
+    } else {
+      const statLabel = hitAbility.dmgType === 'physical' ? 'ATK' : 'INT';
+      const defLabel = hitAbility.dmgType === 'physical' ? 'DEF' : 'INT';
+      log(`  ${label ? label + ': ' : ''}Base: ${result.baseDmg}, Roll: 2d6+${statLabel}=${result.atkRoll} vs 2d6+${defLabel}=${result.defRoll} (×${result.multiplier.toFixed(2)})`, 'roll');
+    }
+
+    // Death Lust: bonus soul damage on attacks
+    if (attacker.deathLustTurns > 0 && !hitAbility.heal && !hitAbility.grantDeathLust) {
+      const soulBonus = Math.max(1, Math.floor(dmg * 0.3));
+      dmg += soulBonus;
+      log(`  Death Lust! +${soulBonus} bonus soul damage!`, 'status');
+    }
+
+    // Frozen target takes reduced damage but thaws
+    if (defender.status === 'frozen' && !hitAbility.requiresFrozen) {
+      dmg = Math.max(1, Math.floor(dmg * 0.8));
+      defender.status = null; defender.statusTurns = 0;
+      log(`  ${defName} thaws from the impact! (damage slightly reduced)`, 'status');
       updateHpBar(!isPlayer ? 'player' : 'opponent');
     }
+
+    const isBigHit = result.multiplier >= 1.2;
+
+    defender.currentHp = Math.max(0, defender.currentHp - dmg);
+    defender.damagedThisTurn = true;
+    updateHpBar(!isPlayer ? 'player' : 'opponent');
+    showDmgFloat(!isPlayer ? 'player' : 'opponent', dmg, isBigHit, false);
+    log(`  ${defName} takes ${dmg} ${hitAbility.dmgType} damage!`, 'damage');
+    renderRoster(!isPlayer ? 'player' : 'opponent');
+
+    // Shatter unfreezes after dealing bonus damage
+    if (hitAbility.requiresFrozen && defender.status === 'frozen') {
+      defender.status = null; defender.statusTurns = 0;
+      log(`  ${defName} shatters free from the ice!`, 'status');
+      updateHpBar(!isPlayer ? 'player' : 'opponent');
+    }
+
+    if (hitAbility.drain) {
+      const healAmt = Math.floor(dmg * hitAbility.drain);
+      attacker.currentHp = Math.min(attacker.maxHp, attacker.currentHp + healAmt);
+      updateHpBar(isPlayer ? 'player' : 'opponent');
+      log(`  ${atkName} drains ${healAmt} HP!`, 'heal');
+      renderRoster(isPlayer ? 'player' : 'opponent');
+    }
+
+    // Subdue: lock opponent's switch
+    if (hitAbility.lockSwitch) {
+      defender.switchLocked = true;
+      log(`  ${defName} is pinned! Can't switch next turn.`, 'status');
+    }
+
+    // Dirty Boxing stance: chance to stun on dealing damage
+    if (attacker.stance && attacker.stance.passive === 'stunOnHit' && !defender.status && !defender.fainted && defender.currentHp > 0) {
+      if (Math.random() < 0.2) {
+        defender.status = 'stun'; defender.statusTurns = 1;
+        log(`  Dirty Boxing! ${defName} is stunned!`, 'status');
+        updateHpBar(!isPlayer ? 'player' : 'opponent');
+      }
+    }
+
+    if (hitAbility.effect && !defender.status) {
+      const saveDC = 8 + mod(attacker.stats[hitAbility.stat]) + Math.floor(attacker.level/4) + 2;
+      const save = d(20) + mod(defender.stats.def);
+      if (save < saveDC) {
+        const turns = hitAbility.effect === 'stun' ? 1 : 3;
+        defender.status = hitAbility.effect; defender.statusTurns = turns;
+        log(`  ${defName} is ${hitAbility.effect}ed! (DC ${saveDC}, saved ${save})`, 'status');
+      } else {
+        log(`  ${defName} saves vs ${hitAbility.effect}! (DC ${saveDC}, rolled ${save})`, 'roll');
+      }
+      updateHpBar(!isPlayer ? 'player' : 'opponent');
+    }
+
+    // Freeze chance (from ability or Arctic Aura stance)
+    if (!defender.status && !defender.fainted && defender.currentHp > 0) {
+      let freezeChance = hitAbility.freezeChance || 0;
+      if (attacker.stance && attacker.stance.passive === 'freezeAll') freezeChance += 0.1;
+      if (freezeChance > 0 && Math.random() < freezeChance) {
+        defender.status = 'frozen'; defender.statusTurns = 99;
+        log(`  ${defName} is frozen solid!`, 'status');
+        updateHpBar(!isPlayer ? 'player' : 'opponent');
+      }
+    }
+
+    return dmg;
   }
 
-  if (defender.currentHp <= 0) {
+  // Execute the hit(s)
+  if (ability.doubleHit) {
+    // Tump Up: first hit normal, second hit harder but can miss
+    await dealHit(ability, 'First hit');
+    if (!defender.fainted) {
+      await delay(200);
+      // Second hit: +50% fixed damage but needs an attack roll
+      const secondHitAbility = {...ability, fixed: Math.floor((ability.fixed || 0) * 1.5), doubleHit: false};
+      const roll = attackRoll(attacker, {acc: -1, stat: ability.stat}, 10 + defender.stats.def);
+      if (roll.hit) {
+        log(`  Second hit connects! (rolled ${roll.nat})`, 'roll');
+        await dealHit(secondHitAbility, 'Second hit');
+      } else {
+        log(`  Second hit misses! (rolled ${roll.nat})`, 'miss');
+        atkSprite.classList.add('attacking'); await delay(150); atkSprite.classList.remove('attacking');
+      }
+    }
+  } else {
+    await dealHit(ability);
+  }
+
+  if (defender.currentHp <= 0 && !defender.fainted) {
     defender.fainted = true; animateFaint(defender);
     // Soul Snatcher stance: heal on kill
     if (attacker.stance && attacker.stance.passive === 'killHeal') {
@@ -1192,8 +1287,30 @@ async function executeAbility(attacker, defender, ability) {
 }
 
 async function tickStatus(battler) {
-  if (!battler.status) return;
   const isPlayer = playerTeam.includes(battler);
+
+  // Pit Veteran regen
+  if (battler.stance && battler.stance.passive === 'regenTick' && battler.currentHp < battler.maxHp && !battler.fainted) {
+    const regen = Math.max(1, Math.floor(battler.maxHp * 0.05));
+    battler.currentHp = Math.min(battler.maxHp, battler.currentHp + regen);
+    updateHpBar(isPlayer ? 'player' : 'opponent');
+    showDmgFloat(isPlayer ? 'player' : 'opponent', regen, false, true);
+    log(`${battler.name} regenerates ${regen} HP!`, 'heal');
+    renderRoster(isPlayer ? 'player' : 'opponent');
+  }
+
+  // Death Lust decrement
+  if (battler.deathLustTurns > 0) {
+    battler.deathLustTurns--;
+    if (battler.deathLustTurns <= 0) {
+      log(`${battler.name}'s Death Lust fades.`, 'status');
+    }
+  }
+
+  // Clear switch lock at end of turn
+  battler.switchLocked = false;
+
+  if (!battler.status) return;
   if (battler.status === 'poison') {
     const dmg = Math.max(1, Math.floor(battler.maxHp / 10));
     battler.currentHp = Math.max(0, battler.currentHp - dmg);
