@@ -943,9 +943,14 @@ async function startBattle() {
   const lichCls = CLASSES.find(c => c.id === 'lich');
   const pitDwellerCls = CLASSES.find(c => c.id === 'pitDweller');
   if (TESTING_1V1) {
-    // 1v1 test mode: Lich vs Pit Dweller
-    playerTeam = [createCombatant(lichCls, level)];
-    oppTeam = [createCombatant(pitDwellerCls, level)];
+    // 1v1 test mode: 50/50 who you play as
+    if (Math.random() < 0.5) {
+      playerTeam = [createCombatant(lichCls, level)];
+      oppTeam = [createCombatant(pitDwellerCls, level)];
+    } else {
+      playerTeam = [createCombatant(pitDwellerCls, level)];
+      oppTeam = [createCombatant(lichCls, level)];
+    }
   } else {
     // Full 4v4 mode
     let available = shuffle(CLASSES.filter(c => c.id !== 'lich' && c.id !== 'pitDweller'));
