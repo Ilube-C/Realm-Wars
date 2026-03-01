@@ -1441,7 +1441,7 @@ async function executeAbility(attacker, defender, ability) {
 
     // Dirty Boxing stance: chance to stun on dealing damage
     if (attacker.stance && attacker.stance.passive === 'stunOnHit' && !defender.status && !defender.fainted && defender.currentHp > 0) {
-      const stunChance = 0.2 + (Math.max(0, (attacker.stats.cha - defender.stats.cha)) * 0.03);
+      const stunChance = 0.2 + (Math.max(0, (attacker.stats.cha - defender.stats.cha)) * 0.02);
       if (Math.random() < stunChance) {
         defender.status = 'stun'; defender.statusTurns = 1;
         log(`  Dirty Boxing! ${defName} is stunned!`, 'status');
@@ -1466,7 +1466,7 @@ async function executeAbility(attacker, defender, ability) {
     if (!defender.status && !defender.fainted && defender.currentHp > 0) {
       let freezeChance = hitAbility.freezeChance || 0;
       if (attacker.stance && attacker.stance.passive === 'freezeAll') freezeChance += 0.1;
-      freezeChance += (Math.max(0, (attacker.stats.cha - defender.stats.cha)) * 0.03); // CHA adds flat % bonus to freeze
+      freezeChance += (Math.max(0, (attacker.stats.cha - defender.stats.cha)) * 0.02); // CHA adds flat % bonus to freeze
       if (freezeChance > 0 && Math.random() < freezeChance) {
         defender.status = 'frozen'; defender.statusTurns = 99;
         log(`  ${defName} is frozen solid!`, 'status');
@@ -1476,7 +1476,7 @@ async function executeAbility(attacker, defender, ability) {
 
     // Blind application from Radial Strike
     if (hitAbility.blindChance && !defender.fainted && defender.currentHp > 0) {
-      if (Math.random() < hitAbility.blindChance + (Math.max(0, (attacker.stats.cha - defender.stats.cha)) * 0.03)) {
+      if (Math.random() < hitAbility.blindChance + (Math.max(0, (attacker.stats.cha - defender.stats.cha)) * 0.02)) {
         defender.blindStacks++;
         log(`  ${defName} is blinded! (${defender.blindStacks} stack${defender.blindStacks>1?'s':''}, ${defender.blindStacks*15}% miss)`, 'status');
         updateHpBar(!isPlayer ? 'player' : 'opponent');
@@ -1485,7 +1485,7 @@ async function executeAbility(attacker, defender, ability) {
 
     // Battlefield Star: small chance to blind each hit
     if (attacker.stance && attacker.stance.passive === 'blindPerTurn' && !defender.fainted && defender.currentHp > 0) {
-      const bsBlindChance = 0.15 + (Math.max(0, (attacker.stats.cha - defender.stats.cha)) * 0.03);
+      const bsBlindChance = 0.15 + (Math.max(0, (attacker.stats.cha - defender.stats.cha)) * 0.02);
       if (Math.random() < bsBlindChance) {
         defender.blindStacks++;
         log(`  Battlefield Star! ${defName} is dazzled! (${defender.blindStacks} blind stack${defender.blindStacks>1?'s':''})`, 'status');
@@ -1495,7 +1495,7 @@ async function executeAbility(attacker, defender, ability) {
 
     // Burn chance (Emberang)
     if (hitAbility.burnChance && !defender.fainted && defender.currentHp > 0) {
-      const bChance = hitAbility.burnChance + (Math.max(0, (attacker.stats.cha - defender.stats.cha)) * 0.03);
+      const bChance = hitAbility.burnChance + (Math.max(0, (attacker.stats.cha - defender.stats.cha)) * 0.02);
       if (Math.random() < bChance) {
         defender.burnStacks++;
         log(`  ${defName} is burning! (${defender.burnStacks} stack${defender.burnStacks>1?'s':''})`, 'status');
