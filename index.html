@@ -1290,7 +1290,7 @@ async function executeAbility(attacker, defender, ability) {
   if (attacker.status === 'frozen') {
     // Healing Prayer bypasses frozen inaction
     if (ability.healingPrayer) {
-      log(`${atkName} wills through the ice with a Healing Prayer!`, 'status');
+      log(`${atkName} wills through the ice — in the ice, only God can hear you!`, 'status');
     } else {
       const roll = Math.random();
       if (roll < 0.333) {
