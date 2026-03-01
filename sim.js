@@ -26,7 +26,7 @@ const ABILITIES = {
   lichBlast:    { name:'Lich Blast',      dmgType:'magical',  stat:'int', fixed:8,  dice:[2,6],  uses:14, freezeChance:0.2 },
   glaciate:     { name:'Glaciate',        dmgType:'magical',  stat:'int', fixed:5,  dice:[1,4],  uses:16, freezeChance:0.6 },
   lichLifeDrain:{ name:'Life Drain',      dmgType:'soul',     stat:'int', fixed:7,  dice:[1,8],  uses:10, drain:0.5 },
-  shatter:      { name:'Shatter',         dmgType:'physical', stat:'int', fixed:22, dice:[2,8],  uses:6,  requiresFrozen:true },
+  shatter:{name:'Shatter',dmgType:'physical',stat:'atk',fixed:8,dice:[1,6],uses:6,requiresFrozen:true,currentHpPct:0.3},
   tumpUp:       { name:'Tump Up',         dmgType:'physical', stat:'atk', fixed:5,  dice:[1,6],  uses:16, doubleHit:true },
   counterThrow: { name:'Counter Throw',   dmgType:'physical', stat:'atk', fixed:7,  dice:[1,6],  uses:10, counterMove:true, counterBonus:0.75 },
   subdue:       { name:'Subdue',          dmgType:'physical', stat:'atk', fixed:12, dice:[1,6],  uses:12, switchLock:true },
@@ -266,6 +266,7 @@ function simulateBattle(cls1, cls2) {
 
         // Death Lust soul bonus
         if (attacker.deathLustTurns > 0 && !ability.heal && !ability.grantDeathLust) dmg += 5;
+        if (ability.currentHpPct && defender.currentHp > 0) dmg += Math.floor(defender.currentHp * ability.currentHpPct);
 
         // Frozen damage reduction
         if (defender.status === 'frozen') dmg = Math.round(dmg * 0.8);
