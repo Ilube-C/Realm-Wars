@@ -1386,6 +1386,16 @@ const STRUGGLE = { name:'Desperate Strike', dmgType:'physical', stat:'atk', dice
 
 async function executeTurn(moveIdx) {
   if (isAnimating) return;
+  // Safety: if active player unit is fainted or at 0 HP, force faint handling
+  const safeP = player();
+  if (safeP && (safeP.fainted || safeP.currentHp <= 0)) {
+    if (!safeP.fainted) { safeP.fainted = true; animateFaint(safeP); }
+    isAnimating = true;
+    try { await handleFaint('player'); } finally { isAnimating = false; }
+    renderMoves(); renderRoster('player'); renderRoster('opponent');
+    if (checkWin()) return;
+    return;
+  }
   isAnimating = true;
   hideTooltip();
   try {
