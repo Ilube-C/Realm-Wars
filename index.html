@@ -802,7 +802,9 @@ function rollDamageForAbility(attacker, defender, ability) {
   }
   const atkRoll = rollDice(2, 6) + atkStat;
   const defRoll = rollDice(2, 6) + defStat;
-  const multiplier = 0.5 + 0.5 * (atkRoll / defRoll);
+  const floor = ability.dmgType === 'magical' ? 0.55 : 0.5;
+  const variable = ability.dmgType === 'magical' ? 0.45 : 0.5;
+  const multiplier = floor + variable * (atkRoll / defRoll);
   const damage = Math.max(1, Math.floor(baseDmg * multiplier));
   return { damage, baseDmg, atkRoll, defRoll, multiplier };
 }
@@ -979,9 +981,10 @@ function calcMoveStats(ability, attacker) {
     maxBase = fixed + count * sides;
     avgBase = fixed + count * (sides + 1) / 2;
     atkStat = ability.dmgType === 'physical' ? attacker.stats.atk : attacker.stats.int;
-    // ATK/DEF multiplier range: ~0.5x to ~1.5x
-    minDmg = Math.max(1, Math.floor(minBase * 0.5));
-    maxDmg = Math.ceil(maxBase * 1.5);
+    // ATK/DEF multiplier range: physical ~0.5x-1.5x, magical ~0.55x-1.45x
+    const mFloor = ability.dmgType === 'magical' ? 0.55 : 0.5;
+    minDmg = Math.max(1, Math.floor(minBase * mFloor));
+    maxDmg = Math.ceil(maxBase * (mFloor + (1 - mFloor) * 2));
     avgDmg = avgBase;
   }
   const variance = count * (sides * sides - 1) / 12;
@@ -1546,7 +1549,7 @@ async function executeTurn(moveIdx) {
             const baseDmg = ability.fixed + rollDice(ability.dice[0], ability.dice[1]);
             const atkRoll = rollDice(2, 6) + caster.stats.int;
             const defRoll = rollDice(2, 6) + target.stats.int;
-            const mult = 0.5 + 0.5 * (atkRoll / Math.max(1, defRoll));
+            const mult = 0.55 + 0.45 * (atkRoll / Math.max(1, defRoll));
             const dmg = Math.max(1, Math.round(baseDmg * mult));
             target.currentHp = Math.max(0, target.currentHp - dmg);
             target.damagedThisTurn = true;
