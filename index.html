@@ -581,7 +581,7 @@ const CLASSES = [
     stats:{atk:8,spd:12,con:8,int:5,def:6,cha:5},
     abilities:['headbutt','chomp'], sprite:'barbarian',
     stances: [
-      { id:'prickly', name:'Prickly', desc:'Enemies attacking you take 1 damage.',
+      { id:'prickly', name:'Prickly', desc:'Enemies attacking you take 3 damage.',
         statBoosts:{}, passive:'prickly' },
     ]},
   { id:'jahApostle', label:'Cleric', fixedName:'Jah Apostle', color:'#9966cc',
@@ -1844,7 +1844,7 @@ async function executeAbility(attacker, defender, ability) {
     // Auto-apply Prickly stance
     applyStance(boar, boar.stances[0]);
     log(`${atkName} summons a Battle Boar and withdraws!`, 'switch');
-    log(`Battle Boar enters with Prickly stance! Enemies take 1 damage when attacking.`, 'info');
+    log(`Battle Boar enters with Prickly stance! Enemies take 3 damage when attacking.`, 'info');
     renderActiveInfo(isPlayer ? 'player' : 'opponent');
     renderSprite(isPlayer ? 'player' : 'opponent');
     renderRoster(isPlayer ? 'player' : 'opponent');
@@ -2241,8 +2241,8 @@ async function executeAbility(attacker, defender, ability) {
 
     // Prickly: attacker takes 1 damage when hitting a Prickly unit
     if (defender.stance?.passive === 'prickly' && dmg > 0 && !hitAbility.heal && !attacker.fainted && attacker.currentHp > 0) {
-      attacker.currentHp = Math.max(1, attacker.currentHp - 1);
-      log(`  Prickly! ${atkName} takes 1 thorn damage from hitting ${defName}!`, 'damage');
+      attacker.currentHp = Math.max(1, attacker.currentHp - 3);
+      log(`  Prickly! ${atkName} takes 3 thorn damage from hitting ${defName}!`, 'damage');
       updateHpBar(isPlayer ? 'player' : 'opponent');
     }
 
