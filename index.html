@@ -454,9 +454,9 @@ const ABILITIES = {
   headbutt:     { name:'Headbutt',       dmgType:'physical', stat:'atk', fixed:6,  dice:[1,4],  acc:0,  uses:20, desc:'Ram your head into the enemy. Low damage but 25% chance to flinch.', flinchChance:0.25 },
   chomp:        { name:'Chomp',          dmgType:'physical', stat:'atk', fixed:4,  dice:[1,4],  acc:0,  uses:20, desc:'Bite down hard. Low damage but applies a stack of Wounded.', chomp:true },
   // JAH APOSTLE ABILITIES
-  moonlight:     { name:'Moonlight',       dmgType:'heal',     stat:'int', fixed:0,  dice:[1,1],  acc:99, uses:8,  desc:'Bathe your team in moonlight. Heals all teammates (including benched) for a small amount.', moonlight:true, heal:true },
+  moonlight:     { name:'Moonlight',       dmgType:'heal',     stat:'int', fixed:0,  dice:[1,1],  acc:99, uses:8,  desc:'Channel moonlight. Heals self for 25% max HP. The next ally to switch in is also healed for the same amount.', moonlight:true, heal:true },
   readScripture: { name:'Read Scripture',  dmgType:'soul',     stat:'int', fixed:6,  dice:[1,6],  acc:0,  uses:14, desc:'Read from the forbidden text. Low soul damage. 30% chance to deal high soul damage instead.', readScripture:true },
-  inviteJudgement:{ name:'Invite Judgement', dmgType:'soul',   stat:'int', fixed:0,  dice:[1,1],  acc:99, uses:6,  desc:'The enemy with the highest HP% loses 20% of their max HP. Ignores defences.', inviteJudgement:true },
+  inviteJudgement:{ name:'Invite Judgement', dmgType:'soul',   stat:'int', fixed:0,  dice:[1,1],  acc:99, uses:6,  desc:'The active opponent loses 20% of their max HP. Ignores defences.', inviteJudgement:true },
   lookAtMe:      { name:'Look at Me',     dmgType:'soul',     stat:'cha', fixed:0,  dice:[1,1],  acc:99, uses:6,  desc:'Prevent the target from switching this turn. If they try, your team gains a 2-turn shield.', lookAtMe:true },
   // LEXILAS ABILITIES
   recklessSwing: { name:'Reckless Swing', dmgType:'physical', stat:'atk', fixed:16, dice:[2,6], acc:0, uses:10, desc:'Devastating overhead swing. Deals 10% of damage dealt as recoil to self.', recklessSwing:true },
@@ -749,7 +749,7 @@ function createCombatant(cls, level) {
     justSwitchedIn: false, overwhelmSuppressed: false, chivalryPending: false,
     ancientPowerPending: [], // [{turnsLeft, attacker(ref), target(ref)}]
     isSummon: cls.isSummon || false, summonOwner: null, // for boar: who summoned it
-    curseStacks: 0, shieldTurns: 0, lookAtMeLocked: false, // Cleric mechanics
+    curseStacks: 0, shieldTurns: 0, shieldHp: 0, lookAtMeLocked: false, // Cleric mechanics
   };
 }
 
@@ -857,7 +857,7 @@ function renderStatusEffects(b) {
   if (b.whittleBoost > 0) html += `<span class="status-effect-tag" style="background:#3a2a1a;color:#ca8">🔪 WHETTED (+${b.whittleBoost} ATK)</span>`;
   if (b.woundedStacks > 0) html += `<span class="status-effect-tag" style="background:#4a1a2a;color:#e66">🩸 WOUNDED ×${b.woundedStacks}</span>`;
   if (b.curseStacks > 0) html += `<span class="status-effect-tag" style="background:#2a1a3a;color:#a6c">👁 CURSED ×${b.curseStacks}</span>`;
-  if (b.shieldTurns > 0) html += `<span class="status-effect-tag" style="background:#1a2a4a;color:#6af">🛡 SHIELD (${b.shieldTurns}t)</span>`;
+  if (b.shieldTurns > 0 && b.shieldHp > 0) html += `<span class="status-effect-tag" style="background:#1a2a4a;color:#6af">🛡 SHIELD ${b.shieldHp}HP (${b.shieldTurns}t)</span>`;
   if (b.lookAtMeLocked) html += `<span class="status-effect-tag" style="background:#3a1a3a;color:#c6a">🔒 LOCKED</span>`;
   return html ? `<div class="status-effects-row">${html}</div>` : '';
 }
@@ -1242,6 +1242,22 @@ async function promptPlayerStance(combatant) {
   renderActiveInfo('player'); renderRoster('player'); renderMoves();
 }
 
+// Check if any teammate has a moonlight heal stored, apply to the switching-in unit
+function applyMoonlightHeal(switchingIn, team, who) {
+  for (const member of team) {
+    if (member !== switchingIn && member.moonlightHeal && member.moonlightHeal > 0) {
+      const heal = Math.min(member.moonlightHeal, switchingIn.maxHp - switchingIn.currentHp);
+      if (heal > 0) {
+        switchingIn.currentHp += heal;
+        log(`Moonlight blesses ${switchingIn.name}! Healed ${heal} HP!`, 'heal');
+        updateHpBar(who); renderRoster(who);
+      }
+      member.moonlightHeal = 0;
+      break; // Only one moonlight heal per switch
+    }
+  }
+}
+
 function clearEffectsOnSwitchOut(unit) {
   // Restoration: heal on switch-out (before removing stance)
   if (unit.stance?.passive === 'restoration' && !unit.fainted && unit.currentHp > 0) {
@@ -1269,11 +1285,12 @@ async function doSwitch(newIdx) {
     // Grant shield to opponent team
     const oppTeamMembers = oppTeam;
     let shieldTurns = 2;
-    if (opponent().stance?.passive === 'healBoost') shieldTurns = 3; // Gekyume's boost
+    let shieldHp = 15;
+    if (opponent().stance?.passive === 'healBoost') { shieldTurns = 3; shieldHp = 20; }
     for (const member of oppTeamMembers) {
-      if (!member.fainted) member.shieldTurns = Math.max(member.shieldTurns, shieldTurns);
+      if (!member.fainted) { member.shieldTurns = Math.max(member.shieldTurns, shieldTurns); member.shieldHp = Math.max(member.shieldHp, shieldHp); }
     }
-    log(`The opponent's team gains a ${shieldTurns}-turn shield from the failed switch!`, 'status');
+    log(`The opponent's team gains a ${shieldHp}HP shield for ${shieldTurns} turns!`, 'status');
     updateHpBar('player'); updateHpBar('opponent');
     renderRoster('player'); renderRoster('opponent');
     player().lookAtMeLocked = false;
@@ -1309,6 +1326,9 @@ async function doSwitch(newIdx) {
       }
       renderActiveInfo('player'); renderRoster('player'); renderMoves();
     }
+
+    // Moonlight heal on switch-in
+    applyMoonlightHeal(player(), playerTeam, 'player');
 
     // Opponent gets a free attack
     await delay(400);
@@ -1552,6 +1572,9 @@ async function executeTurn(moveIdx) {
         renderActiveInfo(side); renderRoster(side);
       }
       if (side === 'player') renderMoves();
+      // Moonlight heal on switch-in
+      const switchTeam = side === 'player' ? playerTeam : oppTeam;
+      applyMoonlightHeal(next, switchTeam, side);
       return newIdx;
     }
 
@@ -1750,27 +1773,17 @@ async function executeAbility(attacker, defender, ability) {
     return;
   }
 
-  // Moonlight: heal all teammates including benched
+  // Moonlight: heal self for decent amount + mark next ally to switch in for heal
   if (ability.moonlight) {
-    const team = isPlayer ? playerTeam : oppTeam;
-    let baseHeal = Math.max(5, Math.floor(attacker.maxHp * 0.15));
-    // Gekyume's Blessing: boost healing by 30%
+    let baseHeal = Math.max(8, Math.floor(attacker.maxHp * 0.25));
     if (attacker.stance?.passive === 'healBoost') baseHeal = Math.floor(baseHeal * 1.3);
-    let totalHealed = 0;
-    for (const member of team) {
-      if (member.fainted || member.currentHp <= 0) continue;
-      // Include summon owners
-      const target = member.isSummon && member.summonOwner ? member.summonOwner : member;
-      if (target.fainted) continue;
-      const heal = Math.min(baseHeal, target.maxHp - target.currentHp);
-      if (heal > 0) {
-        target.currentHp += heal;
-        totalHealed += heal;
-      }
-    }
-    log(`${atkName} bathes the team in moonlight! Healed ${totalHealed} HP across all allies!`, 'heal');
-    updateHpBar('player'); updateHpBar('opponent');
-    renderRoster('player'); renderRoster('opponent');
+    const selfHeal = Math.min(baseHeal, attacker.maxHp - attacker.currentHp);
+    attacker.currentHp += selfHeal;
+    // Mark: next ally to switch in gets healed
+    attacker.moonlightHeal = baseHeal;
+    log(`${atkName} channels moonlight! Healed self for ${selfHeal} HP. Next ally to enter will also be healed!`, 'heal');
+    updateHpBar(isPlayer ? 'player' : 'opponent');
+    renderRoster(isPlayer ? 'player' : 'opponent');
     return;
   }
 
@@ -1785,23 +1798,18 @@ async function executeAbility(attacker, defender, ability) {
     // Fall through to normal hit
   }
 
-  // Invite Judgement: highest HP% character loses 15% max HP
+  // Invite Judgement: active enemy with highest HP% loses 20% max HP
   if (ability.inviteJudgement) {
-    // Find enemy character with highest HP%
-    const enemyTeam = isPlayer ? oppTeam : playerTeam;
-    const allFighters = enemyTeam.filter(f => !f.fainted && f.currentHp > 0);
-    let highest = null, highestPct = -1;
-    for (const f of allFighters) {
-      const pct = f.currentHp / f.maxHp;
-      if (pct > highestPct) { highestPct = pct; highest = f; }
-    }
-    if (highest) {
-      let lossAmt = Math.max(1, Math.floor(highest.maxHp * 0.20));
-      highest.currentHp = Math.max(1, highest.currentHp - lossAmt);
-      highest.damagedThisTurn = true;
-      const targetSide = playerTeam.includes(highest) ? 'player' : 'opponent';
+    // Only targets the active opponent
+    const target = defender;
+    if (target && !target.fainted && target.currentHp > 0) {
+      const pct = target.currentHp / target.maxHp;
+      let lossAmt = Math.max(1, Math.floor(target.maxHp * 0.20));
+      target.currentHp = Math.max(1, target.currentHp - lossAmt);
+      target.damagedThisTurn = true;
+      const targetSide = !isPlayer ? 'player' : 'opponent';
       showDmgFloat(targetSide, lossAmt, lossAmt > 15, false);
-      log(`Judgement falls on ${highest.name}! Loses ${lossAmt} HP (${Math.round(highestPct*100)}% was highest)!`, 'damage');
+      log(`Judgement falls on ${target.name}! Loses ${lossAmt} HP (${Math.round(pct*100)}% HP)!`, 'damage');
       updateHpBar('player'); updateHpBar('opponent');
       renderRoster('player'); renderRoster('opponent');
     }
@@ -1961,12 +1969,14 @@ async function executeAbility(attacker, defender, ability) {
 
     const isBigHit = result.multiplier >= 1.2 || isCrit;
 
-    // Shield: flat damage reduction per hit
-    if (defender.shieldTurns > 0 && dmg > 0 && !hitAbility.heal) {
-      const shieldAmt = attacker.stance?.passive === 'healBoost' ? 10 : 8;
-      const reduced = Math.min(dmg, shieldAmt);
-      dmg = Math.max(0, dmg - shieldAmt);
-      log(`  ${defName}'s shield absorbs ${reduced} damage!`, 'status');
+    // Shield: full block up to shieldHp, excess goes through
+    if (defender.shieldTurns > 0 && defender.shieldHp > 0 && dmg > 0 && !hitAbility.heal) {
+      const absorbed = Math.min(dmg, defender.shieldHp);
+      defender.shieldHp -= absorbed;
+      dmg -= absorbed;
+      if (defender.shieldHp <= 0) { defender.shieldTurns = 0; log(`  ${defName}'s shield shatters after absorbing ${absorbed} damage!`, 'status'); }
+      else { log(`  ${defName}'s shield absorbs ${absorbed} damage! (${defender.shieldHp} HP left)`, 'status'); }
+      updateHpBar(!isPlayer ? 'player' : 'opponent');
     }
 
     defender.currentHp = Math.max(0, defender.currentHp - dmg);
@@ -2241,6 +2251,7 @@ async function tickStatus(battler) {
   if (battler.shieldTurns > 0) {
     battler.shieldTurns--;
     if (battler.shieldTurns <= 0) {
+      battler.shieldHp = 0;
       log(`${battler.name}'s shield fades.`, 'info');
     }
     updateHpBar(isPlayer ? 'player' : 'opponent');

@@ -37,7 +37,7 @@ const CLS=[
   {id:'cleric',l:'Cleric',sw:{atk:0.5,spd:1,con:2,int:3.5,def:2,cha:3},ab:['moonlight','readScripture','inviteJudgement','lookAtMe'],st:[{sb:{int:2},p:'hb'},{sb:{cha:2},p:'cpt'}]},
 ];
 let terrain=null;
-function cr(cls){const stats=gs(cls.sw);const hp=20+stats.con*4;return{cls,nm:cls.l,stats,origStats:{...stats},mhp:hp,chp:hp,ab:cls.ab.map(id=>{const a=AB[id];return{...a,id,cu:a.u}}),st:cls.st,stn:null,status:null,dlt:0,dtt:false,bs:0,brn:0,bh:[],sa:false,slt:false,wb:0,fl:false,ps:0,swl:false,ds:0,cp:false,ws:0,fainted:false,apq:[],cs:0,st2:0};}
+function cr(cls){const stats=gs(cls.sw);const hp=20+stats.con*4;return{cls,nm:cls.l,stats,origStats:{...stats},mhp:hp,chp:hp,ab:cls.ab.map(id=>{const a=AB[id];return{...a,id,cu:a.u}}),st:cls.st,stn:null,status:null,dlt:0,dtt:false,bs:0,brn:0,bh:[],sa:false,slt:false,wb:0,fl:false,ps:0,swl:false,ds:0,cp:false,ws:0,fainted:false,apq:[],cs:0,st2:0,shp:0,mlHeal:0,lookAtMeLocked:false};}
 function apS(b,s){b.stn=s;if(s.sb)for(const[k,v]of Object.entries(s.sb))b.stats[k]+=v;if(s.ogE)terrain={tl:5,e:'vine'};}
 function rmS(b){if(b.stn?.sb)for(const[k,v]of Object.entries(b.stn.sb))b.stats[k]-=v;b.stn=null;}
 function clrEff(b){
@@ -109,17 +109,16 @@ function eh(a,d2,ab,myTeam,enemyTeam){
   if(ab.ch){ab.cu--;a.cp=true;rs2();return;}
   if(ab.ap){if(!a.apq)a.apq=[];a.apq.push({tl:2,tgt:d2});ab.cu--;rs2();return;}
   if(ab.tr){if(a.status){d2.status=a.status;a.status=null;}if(a.ps>0){d2.ps+=a.ps;a.ps=0;}if(a.brn>0){d2.brn+=a.brn;a.brn=0;}if(a.bs>0){d2.bs+=a.bs;a.bs=0;}if(a.ws>0){d2.ws+=a.ws;a.ws=0;}if(a.cs>0){d2.cs+=a.cs;a.cs=0;}ab.cu--;rs2();return;}
-  // Moonlight: heal all teammates
+  // Moonlight: heal self 25% + store heal for next switch-in
   if(ab.ml){
-    const heal=Math.max(5,Math.floor(a.mhp*0.15))*(a.stn?.p==='hb'?1.3:1);
-    if(myTeam){for(const m of myTeam){if(!m.fainted&&m.chp>0)m.chp=Math.min(m.mhp,m.chp+Math.floor(heal));}}
+    const heal=Math.max(8,Math.floor(a.mhp*0.25))*(a.stn?.p==='hb'?1.3:1);
+    a.chp=Math.min(a.mhp,a.chp+Math.floor(heal));
+    a.mlHeal=Math.floor(heal); // stored for next ally switch-in
     ab.cu--;rs2();return;
   }
-  // Invite Judgement: highest HP% loses 15% max HP
+  // Invite Judgement: active opponent loses 20% max HP
   if(ab.ij){
-    const all=[...(enemyTeam||[])].filter(f=>!f.fainted&&f.chp>0);
-    let best=null,bpct=-1;for(const f of all){const pct=f.chp/f.mhp;if(pct>bpct){bpct=pct;best=f;}}
-    if(best){const loss=Math.max(1,Math.floor(best.mhp*0.20));best.chp=Math.max(1,best.chp-loss);best.dtt=true;}
+    const loss=Math.max(1,Math.floor(d2.mhp*0.20));d2.chp=Math.max(1,d2.chp-loss);d2.dtt=true;
     ab.cu--;rs2();return;
   }
   // Look at Me: switch lock
@@ -136,8 +135,8 @@ function eh(a,d2,ab,myTeam,enemyTeam){
     if(a.dlt>0&&!ab.hl&&!ab.gdl)dmg+=4;
     // Crit: d100 + ATK > 100 = 1.5x
     if(dmg>0&&!ab.hl&&(Math.floor(Math.random()*100)+1+a.stats.atk)>100){dmg=Math.round(dmg*1.5);}
-    // Shield: flat reduction per hit
-    if(d2.st2>0&&dmg>0&&!ab.hl){dmg=Math.max(0,dmg-(a.stn?.p==='hb'?10:8));}
+    // Shield: full block up to shieldHp, excess goes through
+    if(d2.st2>0&&d2.shp>0&&dmg>0&&!ab.hl){const ab2=Math.min(dmg,d2.shp);d2.shp-=ab2;dmg-=ab2;if(d2.shp<=0)d2.st2=0;}
     if(ab.ev&&d2.chp>0)d2.ws++;
     if(d2.ws>0&&dmg>0)dmg+=d2.ws*2;
     d2.chp-=dmg;d2.dtt=true;
@@ -166,7 +165,7 @@ function tk(b,enemy){
   if(b.stn?.p==='rt'&&b.chp>0&&b.chp<b.mhp)b.chp=Math.min(b.mhp,b.chp+Math.max(1,Math.floor(b.mhp*0.05)));
   if(b.dlt>0)b.dlt--;b.swl=false;b.lookAtMeLocked=false;b.slt=!!b.sa;b.sa=false;b.fl=false;
   // Shield decrement
-  if(b.st2>0)b.st2--;
+  if(b.st2>0){b.st2--;if(b.st2<=0)b.shp=0;}
   // Curse tick: can become any status
   if(b.cs>0&&b.chp>0){
     for(let i=0;i<b.cs;i++){
@@ -208,20 +207,25 @@ function sim4v4(){
     if(d1.a==='switch'){
       // Look at Me: failed switch grants shield
       if(a.lookAtMeLocked){
-        const shT=b.stn?.p==='hb'?3:2;
-        for(const m of t2.members){if(!m.fainted)m.st2=Math.max(m.st2,shT);}
+        const shT=b.stn?.p==='hb'?3:2;const shH=b.stn?.p==='hb'?20:15;
+        for(const m of t2.members){if(!m.fainted){m.st2=Math.max(m.st2,shT);m.shp=Math.max(m.shp,shH);}}
         a.lookAtMeLocked=false;sw1=false;am1=am(a,b,t1.members);
       } else {
-        clrEff(a);t1.active=d1.t;apS(t1.active,rndS(t1.active));if(t1.active.stn?.p==='fb')b.bs+=2;sw1=true;
+        clrEff(a);t1.active=d1.t;apS(t1.active,rndS(t1.active));if(t1.active.stn?.p==='fb')b.bs+=2;
+        // Moonlight heal on switch-in
+        for(const m of t1.members){if(m!==t1.active&&m.mlHeal>0){t1.active.chp=Math.min(t1.active.mhp,t1.active.chp+m.mlHeal);m.mlHeal=0;break;}}
+        sw1=true;
       }
     }else{am1=am(a,b,t1.members);}
     if(d2.a==='switch'){
       if(b.lookAtMeLocked){
-        const shT=a.stn?.p==='hb'?3:2;
-        for(const m of t1.members){if(!m.fainted)m.st2=Math.max(m.st2,shT);}
+        const shT=a.stn?.p==='hb'?3:2;const shH=a.stn?.p==='hb'?20:15;
+        for(const m of t1.members){if(!m.fainted){m.st2=Math.max(m.st2,shT);m.shp=Math.max(m.shp,shH);}}
         b.lookAtMeLocked=false;sw2=false;am2=am(b,a,t2.members);
       } else {
-        clrEff(b);t2.active=d2.t;apS(t2.active,rndS(t2.active));if(t2.active.stn?.p==='fb')t1.active.bs+=2;sw2=true;
+        clrEff(b);t2.active=d2.t;apS(t2.active,rndS(t2.active));if(t2.active.stn?.p==='fb')t1.active.bs+=2;
+        for(const m of t2.members){if(m!==t2.active&&m.mlHeal>0){t2.active.chp=Math.min(t2.active.mhp,t2.active.chp+m.mlHeal);m.mlHeal=0;break;}}
+        sw2=true;
       }
     }else{am2=am(b,a,t2.members);}
     const fa=t1.active,fb=t2.active;
@@ -258,8 +262,8 @@ function sim4v4(){
         if(terrain.tl<=0)terrain=null;}
       tk(fa,fb);tk(fb,fa);
     }
-    if(t1.active.fainted){const al=t1.members.filter(m=>!m.fainted);if(!al.length)return{w:2,t1:t1.members.map(m=>m.cls.l),t2:t2.members.map(m=>m.cls.l)};let best=al[0],bs2=-999;for(const b2 of al){const sc=matchScore(b2,t2.active);if(sc>bs2){bs2=sc;best=b2;}}t1.active=best;apS(t1.active,rndS(t1.active));if(t1.active.stn?.p==='fb')t2.active.bs+=2;}
-    if(t2.active.fainted){const al=t2.members.filter(m=>!m.fainted);if(!al.length)return{w:1,t1:t1.members.map(m=>m.cls.l),t2:t2.members.map(m=>m.cls.l)};let best=al[0],bs2=-999;for(const b2 of al){const sc=matchScore(b2,t1.active);if(sc>bs2){bs2=sc;best=b2;}}t2.active=best;apS(t2.active,rndS(t2.active));if(t2.active.stn?.p==='fb')t1.active.bs+=2;}
+    if(t1.active.fainted){const al=t1.members.filter(m=>!m.fainted);if(!al.length)return{w:2,t1:t1.members.map(m=>m.cls.l),t2:t2.members.map(m=>m.cls.l)};let best=al[0],bs2=-999;for(const b2 of al){const sc=matchScore(b2,t2.active);if(sc>bs2){bs2=sc;best=b2;}}t1.active=best;apS(t1.active,rndS(t1.active));if(t1.active.stn?.p==='fb')t2.active.bs+=2;for(const m of t1.members){if(m!==t1.active&&m.mlHeal>0){t1.active.chp=Math.min(t1.active.mhp,t1.active.chp+m.mlHeal);m.mlHeal=0;break;}}}
+    if(t2.active.fainted){const al=t2.members.filter(m=>!m.fainted);if(!al.length)return{w:1,t1:t1.members.map(m=>m.cls.l),t2:t2.members.map(m=>m.cls.l)};let best=al[0],bs2=-999;for(const b2 of al){const sc=matchScore(b2,t1.active);if(sc>bs2){bs2=sc;best=b2;}}t2.active=best;apS(t2.active,rndS(t2.active));if(t2.active.stn?.p==='fb')t1.active.bs+=2;for(const m of t2.members){if(m!==t2.active&&m.mlHeal>0){t2.active.chp=Math.min(t2.active.mhp,t2.active.chp+m.mlHeal);m.mlHeal=0;break;}}}
   }
   return{w:0,t1:t1.members.map(m=>m.cls.l),t2:t2.members.map(m=>m.cls.l)};
 }
