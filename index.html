@@ -128,6 +128,8 @@ body {
 .status-badge.stun { background: #4a4a1a; color: #aa8; }
 .status-badge.slow { background: #1a2a4a; color: #68a; }
 .status-badge.frozen { background: #1a3a5a; color: #8ad; }
+.status-badge.blind { background: #4a4a2a; color: #cc8; }
+.status-effect-tag.blind { background: #4a4a2a; color: #cc8; }
 
 /* Status Effects Row */
 .status-effects-row { display: flex; gap: 3px; margin-top: 3px; flex-wrap: wrap; }
@@ -428,6 +430,11 @@ const ABILITIES = {
   counterThrow: { name:'Counter Throw',  dmgType:'physical', stat:'atk', fixed:7,  dice:[1,6],  acc:0,  uses:10, desc:'Act with reduced speed. Deals 75% bonus damage if opponent already hit you this turn.', counterMove:true },
   subdue:       { name:'Subdue',         dmgType:'physical', stat:'atk', fixed:12, dice:[1,6],  acc:1,  uses:12, desc:'Pin the opponent down. Prevents them from switching next turn.', lockSwitch:true },
   deathLust:    { name:'Death Lust',     dmgType:'physical', stat:'atk', fixed:6,  dice:[1,4],  acc:99, uses:4,  desc:'Enter a frenzy. Adds +5 flat soul damage per hit for 3 turns. Doubled on multi-hit moves. Lost on switching.', grantDeathLust:true },
+  // SIR SHINING ABILITIES
+  radialStrike: { name:'Radial Strike',  dmgType:'physical', stat:'atk', fixed:9,  dice:[1,6],  acc:1,  uses:16, desc:'Sweeping holy blade strike. Chance to apply a stack of blind.', blindChance:0.4 },
+  makeWay:      { name:'Make Way',       dmgType:'physical', stat:'atk', fixed:5,  dice:[1,4],  acc:99, uses:6,  desc:'Charge with massive speed boost and DEF bonus for the turn, then switch out at end of turn.', makeWay:true },
+  heavenlyBlow: { name:'Heavenly Blow',  dmgType:'physical', stat:'atk', fixed:8,  dice:[1,8],  acc:0,  uses:10, desc:'Half physical, half magical damage. Hits both defences.', splitDamage:true },
+  healingPrayer:{ name:'Healing Prayer', dmgType:'heal',     stat:'cha', fixed:0,  dice:[1,1],  acc:99, uses:4,  desc:'Pray for healing. At end of NEXT turn, your active unit heals and is cured of all statuses.', healingPrayer:true, heal:true },
 };
 
 // ============================================================
@@ -486,6 +493,15 @@ const CLASSES = [
   { id:'monk', label:'Monk', color:'#aa8844',
     stats:{atk:10,spd:17,con:12,int:10,def:16,cha:8},
     abilities:['flurry','kiBlast','execute','meditation'], sprite:'monk' },
+  { id:'sirShining', label:'Paladin', fixedName:'Sir Shining', color:'#ddcc44',
+    stats:{atk:14,spd:10,con:15,int:12,def:17,cha:16},
+    abilities:['radialStrike','makeWay','heavenlyBlow','healingPrayer'], sprite:'knight',
+    stances: [
+      { id:'battlefieldStar', name:'Battlefield Star', desc:'CHA+2. Small chance to apply blind stack to opponent at start of every turn.',
+        statBoosts:{cha:2}, passive:'blindPerTurn' },
+      { id:'flashyArrival', name:'Flashy Arrival', desc:'DEF+2. Applies 2 stacks of blind to opponent upon selection.',
+        statBoosts:{def:2}, passive:'flashyBlind' },
+    ]},
   { id:'pitDweller', label:'Berserker', fixedName:'Pit Dweller', color:'#8a4422',
     stats:{atk:17,spd:9,con:16,int:6,def:12,cha:8},
     abilities:['tumpUp','counterThrow','subdue','deathLust'], sprite:'barbarian',
@@ -617,6 +633,7 @@ function createCombatant(cls, level) {
     status: null, statusTurns: 0, fainted: false,
     stance: null, stances: cls.stances || null,
     switchLocked: false, deathLustTurns: 0, damagedThisTurn: false,
+    blindStacks: 0, healingPrayerPending: false, makeWaySwitch: false, defBonusThisTurn: 0,
   };
 }
 
@@ -694,8 +711,10 @@ function renderStatusEffects(b) {
     const turnsLeft = b.status === 'frozen' ? '' : ` (${b.statusTurns}t)`;
     html += `<span class="status-effect-tag ${b.status}">${icon} ${b.status.toUpperCase()}${turnsLeft}</span>`;
   }
+  if (b.blindStacks > 0) html += `<span class="status-effect-tag blind">😵 BLIND ×${b.blindStacks} (${b.blindStacks*15}% miss)</span>`;
   if (b.deathLustTurns > 0) html += `<span class="status-effect-tag" style="background:#4a1a1a;color:#e44">🔥 DEATH LUST (${b.deathLustTurns}t)</span>`;
   if (b.switchLocked) html += `<span class="status-effect-tag" style="background:#3a2a1a;color:#c86">📌 PINNED</span>`;
+  if (b.healingPrayerPending) html += `<span class="status-effect-tag" style="background:#2a4a2a;color:#8c8">🙏 PRAYER PENDING</span>`;
   return html ? `<div class="status-effects-row">${html}</div>` : '';
 }
 
@@ -895,6 +914,16 @@ function applyStance(combatant, stance) {
       combatant.currentHp += diff;
     }
   }
+  // Flashy Arrival: apply 2 blind stacks to opponent on stance selection
+  if (stance.passive === 'flashyBlind') {
+    const isPlayer = playerTeam.includes(combatant);
+    const target = isPlayer ? opponent() : player();
+    if (target && !target.fainted) {
+      target.blindStacks += 2;
+      log(`Flashy Arrival! ${target.name} is blinded! (${target.blindStacks} stacks, ${target.blindStacks*15}% miss)`, 'status');
+      updateHpBar(!isPlayer ? 'player' : 'opponent');
+    }
+  }
 }
 
 function removeStance(combatant) {
@@ -942,15 +971,13 @@ async function startBattle() {
   const TESTING_1V1 = true; // Set to false to restore 4v4
   const lichCls = CLASSES.find(c => c.id === 'lich');
   const pitDwellerCls = CLASSES.find(c => c.id === 'pitDweller');
+  const sirShiningCls = CLASSES.find(c => c.id === 'sirShining');
   if (TESTING_1V1) {
-    // 1v1 test mode: 50/50 who you play as
-    if (Math.random() < 0.5) {
-      playerTeam = [createCombatant(lichCls, level)];
-      oppTeam = [createCombatant(pitDwellerCls, level)];
-    } else {
-      playerTeam = [createCombatant(pitDwellerCls, level)];
-      oppTeam = [createCombatant(lichCls, level)];
-    }
+    // 1v1 test mode: random matchup from custom characters
+    const customs = [lichCls, pitDwellerCls, sirShiningCls];
+    const shuffled = shuffle(customs);
+    playerTeam = [createCombatant(shuffled[0], level)];
+    oppTeam = [createCombatant(shuffled[1], level)];
   } else {
     // Full 4v4 mode
     let available = shuffle(CLASSES.filter(c => c.id !== 'lich' && c.id !== 'pitDweller'));
@@ -1053,11 +1080,16 @@ async function executeTurn(moveIdx) {
     p.damagedThisTurn = false;
     o.damagedThisTurn = false;
 
-    // Counter Throw: user acts with reduced speed
+    // Speed modifiers
     let pInit = getInitiative(p);
     let oInit = getInitiative(o);
     if (playerAb.counterMove) pInit = Math.floor(pInit * 0.5);
     if (oppAb.counterMove) oInit = Math.floor(oInit * 0.5);
+    if (playerAb.makeWay) pInit = Math.floor(pInit * 2.0); // massive speed boost
+    if (oppAb.makeWay) oInit = Math.floor(oInit * 2.0);
+    // Make Way: DEF bonus for this turn
+    if (playerAb.makeWay) { p.defBonusThisTurn = 5; p.stats.def += 5; }
+    if (oppAb.makeWay) { o.defBonusThisTurn = 5; o.stats.def += 5; }
 
     let first, second, firstAb, secondAb;
     if (pInit >= oInit) { first = p; second = o; firstAb = playerAb; secondAb = oppAb; }
@@ -1083,6 +1115,72 @@ async function executeTurn(moveIdx) {
     if (!opponent().fainted) await tickStatus(opponent());
     if (player().fainted) await handleFaint('player');
     if (opponent().fainted) await handleFaint('opponent');
+
+    if (checkWin()) return;
+
+    // Restore Make Way DEF bonus
+    if (p.defBonusThisTurn) { p.stats.def -= p.defBonusThisTurn; p.defBonusThisTurn = 0; }
+    if (o.defBonusThisTurn) { o.stats.def -= o.defBonusThisTurn; o.defBonusThisTurn = 0; }
+
+    // Healing Prayer: trigger pending heals
+    for (const b of [p, o]) {
+      if (b.healingPrayerPending && !b.fainted) {
+        const isP = playerTeam.includes(b);
+        const healAmt = Math.max(5, Math.floor(b.maxHp * 0.25));
+        b.currentHp = Math.min(b.maxHp, b.currentHp + healAmt);
+        b.status = null; b.statusTurns = 0; b.blindStacks = 0; // cure all
+        b.healingPrayerPending = false;
+        updateHpBar(isP ? 'player' : 'opponent');
+        showDmgFloat(isP ? 'player' : 'opponent', healAmt, false, true);
+        log(`${b.name}'s Healing Prayer activates! Healed ${healAmt} HP and cured all statuses!`, 'heal');
+        renderRoster(isP ? 'player' : 'opponent');
+      }
+    }
+
+    // Make Way: auto-switch at end of turn (only in 4v4)
+    if (!p.fainted && playerAb.makeWay && playerTeam.length > 1) {
+      const alive = playerTeam.filter((t,i) => i !== playerActive && !t.fainted);
+      if (alive.length > 0) {
+        log(`${p.name} charges through and withdraws!`, 'switch');
+        p.makeWaySwitch = false;
+        // trigger switch
+        const nextIdx = playerTeam.indexOf(alive[0]);
+        if (!autoMode && alive.length > 1) {
+          // Let player pick (reuse death selection)
+          const pickIdx = await showDeathSelectionModal(playerTeam, playerActive);
+          removeStance(p);
+          playerActive = pickIdx;
+        } else {
+          removeStance(p);
+          playerActive = nextIdx;
+        }
+        const next = player();
+        log(`${next.name} the ${next.cls.label} enters the battle!`, 'switch');
+        renderActiveInfo('player'); renderSprite('player'); renderRoster('player');
+        if (next.stances) {
+          if (autoMode) { applyStance(next, aiPickStance(next)); }
+          else {
+            const stance = await showStanceModal(next);
+            applyStance(next, stance);
+            log(`${next.name} enters ${stance.name} stance!`, 'info');
+          }
+          renderActiveInfo('player'); renderRoster('player');
+        }
+        renderMoves();
+      }
+    }
+    if (!o.fainted && oppAb.makeWay && oppTeam.length > 1) {
+      const alive = oppTeam.filter((t,i) => i !== oppActive && !t.fainted);
+      if (alive.length > 0) {
+        log(`${o.name} charges through and withdraws!`, 'switch');
+        removeStance(o);
+        oppActive = oppTeam.indexOf(alive[0]);
+        const next = opponent();
+        if (next.stances) { applyStance(next, aiPickStance(next)); }
+        log(`${next.name} the ${next.cls.label} enters the battle!`, 'switch');
+        renderActiveInfo('opponent'); renderSprite('opponent'); renderRoster('opponent');
+      }
+    }
 
     if (checkWin()) return;
   } finally {
@@ -1133,6 +1231,13 @@ async function executeAbility(attacker, defender, ability) {
   }
 
   if (ability.heal) {
+    if (ability.healingPrayer) {
+      // Delayed heal: triggers at end of NEXT turn on whoever is active
+      attacker.healingPrayerPending = true;
+      log(`${atkName} begins a Healing Prayer! Healing will arrive at end of next turn.`, 'heal');
+      updateHpBar(isPlayer ? 'player' : 'opponent');
+      return;
+    }
     const heal = rollHealForAbility(attacker, ability);
     attacker.currentHp = Math.min(attacker.maxHp, attacker.currentHp + heal);
     updateHpBar(isPlayer ? 'player' : 'opponent');
@@ -1154,11 +1259,35 @@ async function executeAbility(attacker, defender, ability) {
 
   // Helper: deal a single hit
   async function dealHit(hitAbility, label) {
+    // Blind miss check: each stack = 15% miss chance
+    if (attacker.blindStacks > 0) {
+      const missChance = attacker.blindStacks * 0.15;
+      if (Math.random() < missChance) {
+        attacker.blindStacks--;
+        atkSprite.classList.add('attacking'); await delay(150); atkSprite.classList.remove('attacking');
+        log(`  ${label ? label + ': ' : ''}${atkName} misses through the blind! (${attacker.blindStacks} stacks left)`, 'miss');
+        updateHpBar(isPlayer ? 'player' : 'opponent');
+        return 0;
+      }
+    }
+
     atkSprite.classList.add('attacking'); await delay(150); atkSprite.classList.remove('attacking');
     defSprite.classList.add('hit'); await delay(300); defSprite.classList.remove('hit');
 
-    const result = rollDamageForAbility(attacker, defender, hitAbility);
-    let dmg = result.damage;
+    let result, dmg;
+    if (hitAbility.splitDamage) {
+      // Heavenly Blow: half physical (ATK vs DEF), half magical (INT vs INT)
+      const physResult = rollDamageForAbility(attacker, defender, {...hitAbility, dmgType:'physical'});
+      const magResult = rollDamageForAbility(attacker, defender, {...hitAbility, dmgType:'magical', fixed:0, dice:[1,1]});
+      const physHalf = Math.floor(physResult.damage / 2);
+      const magHalf = Math.floor(magResult.damage / 2);
+      dmg = Math.max(1, physHalf + magHalf);
+      result = {damage: dmg, baseDmg: physResult.baseDmg, multiplier: 1.0};
+      log(`  Split damage: ${physHalf} physical + ${magHalf} magical`, 'roll');
+    } else {
+      result = rollDamageForAbility(attacker, defender, hitAbility);
+      dmg = result.damage;
+    }
 
     // Counter Throw: bonus damage if opponent already hit you this turn
     if (hitAbility.counterMove && attacker.damagedThisTurn) {
@@ -1249,6 +1378,24 @@ async function executeAbility(attacker, defender, ability) {
       if (freezeChance > 0 && Math.random() < freezeChance) {
         defender.status = 'frozen'; defender.statusTurns = 99;
         log(`  ${defName} is frozen solid!`, 'status');
+        updateHpBar(!isPlayer ? 'player' : 'opponent');
+      }
+    }
+
+    // Blind application from Radial Strike
+    if (hitAbility.blindChance && !defender.fainted && defender.currentHp > 0) {
+      if (Math.random() < hitAbility.blindChance) {
+        defender.blindStacks++;
+        log(`  ${defName} is blinded! (${defender.blindStacks} stack${defender.blindStacks>1?'s':''}, ${defender.blindStacks*15}% miss)`, 'status');
+        updateHpBar(!isPlayer ? 'player' : 'opponent');
+      }
+    }
+
+    // Battlefield Star: small chance to blind each hit
+    if (attacker.stance && attacker.stance.passive === 'blindPerTurn' && !defender.fainted && defender.currentHp > 0) {
+      if (Math.random() < 0.15) {
+        defender.blindStacks++;
+        log(`  Battlefield Star! ${defName} is dazzled! (${defender.blindStacks} blind stack${defender.blindStacks>1?'s':''})`, 'status');
         updateHpBar(!isPlayer ? 'player' : 'opponent');
       }
     }
