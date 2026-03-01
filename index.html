@@ -435,6 +435,11 @@ const ABILITIES = {
   makeWay:      { name:'Make Way',       dmgType:'physical', stat:'atk', fixed:5,  dice:[1,4],  acc:99, uses:6,  desc:'Charge with massive speed boost and DEF bonus for the turn, then switch out at end of turn.', makeWay:true },
   heavenlyBlow: { name:'Heavenly Blow',  dmgType:'physical', stat:'atk', fixed:8,  dice:[1,8],  acc:0,  uses:10, desc:'Half physical, half magical damage. Hits both defences.', splitDamage:true },
   healingPrayer:{ name:'Healing Prayer', dmgType:'heal',     stat:'cha', fixed:0,  dice:[1,1],  acc:99, uses:4,  desc:'Pray for healing. At end of NEXT turn, your active unit heals and is cured of all statuses.', healingPrayer:true, heal:true },
+  // REX RANG ABILITIES
+  battlerang:   { name:'Battlerang',     dmgType:'physical', stat:'atk', fixed:8,  dice:[1,6],  acc:0,  uses:14, desc:'Medium physical damage. Boomerangs back — hits again at end of next turn.', boomerang:true },
+  emberang:     { name:'Emberang',       dmgType:'physical', stat:'atk', fixed:5,  dice:[1,6],  acc:0,  uses:12, desc:'Less damage than Battlerang but chance to burn. Hits again at end of next turn.', boomerang:true, burnChance:0.35 },
+  whittle:      { name:'Whittle',        dmgType:'physical', stat:'atk', fixed:4,  dice:[1,4],  acc:99, uses:4,  desc:'Sharpen your edge. Grants +4 ATK until you switch out.', grantWhittle:true },
+  swerve:       { name:'Swerve',         dmgType:'physical', stat:'atk', fixed:0,  dice:[1,1],  acc:99, uses:10, desc:'Act fast and dodge. High chance to evade enemy attacks this turn. Much less effective if used consecutively.', swerve:true },
 };
 
 // ============================================================
@@ -454,6 +459,7 @@ const NAMES = {
   assassin:['Shade','Nyx','Vex','Raven','Kael','Silka','Whisper','Dusk'],
   monk:['Kai','Yuki','Zen','Lotus','Jin','Sora','Ryu','Bodhi'],
   lich:['Malachar','Xyranthos','Vek\'thar','Osseus','Dreadhollow','Lichtar','Nekros','Morvaine'],
+  ranger:['Rex','Ranger','Scout','Hawk','Flint','Arrow','Tracker','Swift'],
 };
 
 const CLASSES = [
@@ -490,7 +496,7 @@ const CLASSES = [
   { id:'assassin', label:'Assassin', color:'#607070',
     stats:{atk:10,spd:18,con:12,int:14,def:10,cha:12},
     abilities:['quickStrike','backstab','poisonBlade','herbalRemedy'], sprite:'rogue' },
-  { id:'monk', label:'Monk', color:'#aa8844',
+  { id:'ranger', label:'Ranger', color:'#aa8844',
     stats:{atk:10,spd:17,con:12,int:10,def:16,cha:8},
     abilities:['flurry','kiBlast','execute','meditation'], sprite:'monk' },
   { id:'sirShining', label:'Paladin', fixedName:'Sir Shining', color:'#ddcc44',
@@ -519,6 +525,15 @@ const CLASSES = [
         statBoosts:{con:2,cha:2}, passive:'freezeAll' },
       { id:'soulSnatcher', name:'Soul Snatcher', desc:'INT+3. Heals 20% max HP on killing an enemy.',
         statBoosts:{int:3}, passive:'killHeal' },
+    ]},
+  { id:'rexRang', label:'Ranger', fixedName:'Rex Rang', color:'#6b8e23',
+    statWeights:{atk:4,spd:4,con:1.5,int:0.5,def:2,cha:2},
+    abilities:['battlerang','emberang','whittle','swerve'], sprite:'ranger',
+    stances: [
+      { id:'patientKiller', name:'Patient Killer', desc:'ATK+2. Second hit of Battlerang/Emberang deals bonus damage.',
+        statBoosts:{atk:2}, passive:'boomerangBonus' },
+      { id:'guerillaFighter', name:'Guerilla Fighter', desc:'SPD+2. After an enemy attack misses due to Swerve, switch out.',
+        statBoosts:{spd:2}, passive:'guerillaSwitchOut' },
     ]},
 ];
 
@@ -589,6 +604,7 @@ const SPRITES = {
   druid:     ['.xxx.xxx..','..xxxxxx..','..xxxxxx..','...xxxx...','..xxxxxx..','..xxxxxx..','..xxxxxx..','...xxxx...','..xx..xx..','..x....x..'],
   sorcerer:  ['...xxxx...','..xxxxxx..','..xxxxxx..','...xxxx...','..xxxxxx..','.xxxxxxxx.','..xxxxxx..','..xxxxxx..','...x..x...','...x..x...'],
   monk:      ['....xx....','...xxxx...','...xxxx...','...xxxx...','..xxxxxx..','..xxxxxx..','..xxxxxx..','...xxxx...','..xx..xx..','..x....x..'],
+  ranger:    ['...xxx....','..xxxxx...','..xxxxx...','...xxx....','..xxxx.x..','.xxxxx.x..','..xxxx.x..','...xxx....','..xx..xx..','..x....x..'],
   lich:      ['..x.xx.x..','...xxxx...','..xxxxxx..','..xxxxxx..','...xxxx...','.xxxxxxxx.','..xxxxxx..','..xxxxxx..','...x..x...','..xx..xx..'],
 };
 SPRITES.fighter = SPRITES.knight;
@@ -659,6 +675,7 @@ function createCombatant(cls, level) {
     stance: null, stances: cls.stances || null,
     switchLocked: false, deathLustTurns: 0, damagedThisTurn: false,
     blindStacks: 0, healingPrayerPending: false, makeWaySwitch: false, defBonusThisTurn: 0,
+    boomerangHits: [], burnStacks: 0, swerveActive: false, swerveLastTurn: false, whittleBoost: 0,
   };
 }
 
@@ -740,6 +757,10 @@ function renderStatusEffects(b) {
   if (b.deathLustTurns > 0) html += `<span class="status-effect-tag" style="background:#4a1a1a;color:#e44">🔥 DEATH LUST (${b.deathLustTurns}t)</span>`;
   if (b.switchLocked) html += `<span class="status-effect-tag" style="background:#3a2a1a;color:#c86">📌 PINNED</span>`;
   if (b.healingPrayerPending) html += `<span class="status-effect-tag" style="background:#2a4a2a;color:#8c8">🙏 PRAYER PENDING</span>`;
+  if (b.burnStacks > 0) html += `<span class="status-effect-tag" style="background:#4a2a0a;color:#f84">🔥 BURN ×${b.burnStacks}</span>`;
+  if (b.boomerangHits.length > 0) html += `<span class="status-effect-tag" style="background:#3a3a1a;color:#cc8">🪃 RANG INCOMING (${b.boomerangHits.length})</span>`;
+  if (b.swerveActive) html += `<span class="status-effect-tag" style="background:#1a3a2a;color:#8c8">💨 SWERVING</span>`;
+  if (b.whittleBoost > 0) html += `<span class="status-effect-tag" style="background:#3a2a1a;color:#ca8">🔪 WHETTED (+${b.whittleBoost} ATK)</span>`;
   return html ? `<div class="status-effects-row">${html}</div>` : '';
 }
 
@@ -993,13 +1014,14 @@ async function startBattle() {
   document.getElementById('battle-num').textContent = battleNum;
 
   const level = Math.min(20, 5 + Math.floor(battleNum / 3));
-  const TESTING_1V1 = true; // Set to false to restore 4v4
+  const TESTING_1V1 = window.TESTING_1V1 = true; // Set to false to restore 4v4
   const lichCls = CLASSES.find(c => c.id === 'lich');
   const pitDwellerCls = CLASSES.find(c => c.id === 'pitDweller');
   const sirShiningCls = CLASSES.find(c => c.id === 'sirShining');
+  const rexRangCls = CLASSES.find(c => c.id === 'rexRang');
   if (TESTING_1V1) {
     // 1v1 test mode: random matchup from custom characters
-    const customs = [lichCls, pitDwellerCls, sirShiningCls];
+    const customs = [lichCls, pitDwellerCls, sirShiningCls, rexRangCls];
     const shuffled = shuffle(customs);
     playerTeam = [createCombatant(shuffled[0], level)];
     oppTeam = [createCombatant(shuffled[1], level)];
@@ -1055,6 +1077,8 @@ async function doSwitch(newIdx) {
   try {
     const oldP = player();
     oldP.deathLustTurns = 0; // Death Lust lost on switching
+    if (oldP.whittleBoost) { oldP.stats.atk -= oldP.whittleBoost; oldP.whittleBoost = 0; } // Whittle lost on switching
+    oldP.swerveActive = false; oldP.swerveLastTurn = false;
     removeStance(oldP);
     playerActive = newIdx;
     // Always clear stance on the incoming character so they get a fresh pick
@@ -1113,9 +1137,14 @@ async function executeTurn(moveIdx) {
     if (oppAb.counterMove) oInit = Math.floor(oInit * 0.5);
     if (playerAb.makeWay) pInit = Math.floor(pInit * 2.0); // massive speed boost
     if (oppAb.makeWay) oInit = Math.floor(oInit * 2.0);
+    if (playerAb.swerve) pInit = Math.floor(pInit * 1.5); // Swerve: act fast
+    if (oppAb.swerve) oInit = Math.floor(oInit * 1.5);
     // Make Way: DEF bonus for this turn
     if (playerAb.makeWay) { p.defBonusThisTurn = 5; p.stats.def += 5; }
     if (oppAb.makeWay) { o.defBonusThisTurn = 5; o.stats.def += 5; }
+    // Swerve: set dodge active
+    if (playerAb.swerve) { p.swerveActive = !p.swerveLastTurn ? 'high' : 'low'; }
+    if (oppAb.swerve) { o.swerveActive = !o.swerveLastTurn ? 'high' : 'low'; }
 
     let first, second, firstAb, secondAb;
     if (pInit >= oInit) { first = p; second = o; firstAb = playerAb; secondAb = oppAb; }
@@ -1279,6 +1308,23 @@ async function executeAbility(attacker, defender, ability) {
     log(`${atkName} enters Death Lust! +50% bonus soul damage for 3 turns.`, 'status');
   }
 
+  // Whittle: grant ATK boost until switch out
+  if (ability.grantWhittle) {
+    attacker.whittleBoost += 4;
+    attacker.stats.atk += 4;
+    log(`${atkName} sharpens up! +4 ATK (total +${attacker.whittleBoost} from Whittle).`, 'status');
+    updateHpBar(isPlayer ? 'player' : 'opponent');
+    renderActiveInfo(isPlayer ? 'player' : 'opponent');
+    return;
+  }
+
+  // Swerve: no damage, just the dodge (already set up in executeTurn)
+  if (ability.swerve) {
+    log(`${atkName} swerves${attacker.swerveActive === 'high' ? '! 70% dodge chance this turn' : ' again — only 15% dodge chance'}.`, 'status');
+    updateHpBar(isPlayer ? 'player' : 'opponent');
+    return;
+  }
+
   log(`${atkName} uses ${ability.name}!`);
   const atkSprite = document.getElementById(isPlayer ? 'player-sprite' : 'opp-sprite');
   const defSprite = document.getElementById(isPlayer ? 'opp-sprite' : 'player-sprite');
@@ -1293,6 +1339,22 @@ async function executeAbility(attacker, defender, ability) {
         atkSprite.classList.add('attacking'); await delay(150); atkSprite.classList.remove('attacking');
         log(`  ${label ? label + ': ' : ''}${atkName} misses through the blind! (${attacker.blindStacks} stacks left)`, 'miss');
         updateHpBar(isPlayer ? 'player' : 'opponent');
+        return 0;
+      }
+    }
+
+    // Swerve dodge check: defender dodges if swerving
+    if (defender.swerveActive && !hitAbility.heal && !hitAbility.swerve && !hitAbility.grantWhittle) {
+      const dodgeChance = defender.swerveActive === 'high' ? 0.7 : 0.15;
+      if (Math.random() < dodgeChance) {
+        atkSprite.classList.add('attacking'); await delay(150); atkSprite.classList.remove('attacking');
+        log(`  ${label ? label + ': ' : ''}${defName} swerves out of the way!`, 'miss');
+        // Guerilla Fighter: switch out on dodge
+        if (defender.stance?.passive === 'guerillaSwitchOut' && !window.TESTING_1V1) {
+          // Will be handled by switch logic in 4v4
+          defender.makeWaySwitch = true;
+          log(`  Guerilla Fighter! ${defName} uses the opening to escape!`, 'switch');
+        }
         return 0;
       }
     }
@@ -1429,6 +1491,24 @@ async function executeAbility(attacker, defender, ability) {
       }
     }
 
+    // Burn chance (Emberang)
+    if (hitAbility.burnChance && !defender.fainted && defender.currentHp > 0) {
+      const bChance = hitAbility.burnChance + (attacker.stats.cha / 200);
+      if (Math.random() < bChance) {
+        defender.burnStacks++;
+        log(`  ${defName} is burning! (${defender.burnStacks} stack${defender.burnStacks>1?'s':''})`, 'status');
+        updateHpBar(!isPlayer ? 'player' : 'opponent');
+      }
+    }
+
+    // Boomerang: schedule return hit for end of next turn
+    if (hitAbility.boomerang && !defender.fainted && defender.currentHp > 0) {
+      const bonusMult = (attacker.stance?.passive === 'boomerangBonus') ? 1.3 : 1.0;
+      defender.boomerangHits.push({ damage: Math.round(dmg * 0.6 * bonusMult), source: atkName, ability: hitAbility.name });
+      log(`  The ${hitAbility.name.toLowerCase()} will swing back next turn!`, 'info');
+      updateHpBar(!isPlayer ? 'player' : 'opponent');
+    }
+
     return dmg;
   }
 
@@ -1493,6 +1573,41 @@ async function tickStatus(battler) {
 
   // Clear switch lock at end of turn
   battler.switchLocked = false;
+
+  // Swerve: track for consecutive use penalty, then clear
+  battler.swerveLastTurn = !!battler.swerveActive;
+  battler.swerveActive = false;
+
+  // Burn tick: % max HP per stack, 50% chance to lose a stack
+  if (battler.burnStacks > 0 && !battler.fainted) {
+    const burnDmg = Math.max(1, Math.floor(battler.maxHp * 0.04 * battler.burnStacks));
+    battler.currentHp = Math.max(0, battler.currentHp - burnDmg);
+    updateHpBar(isPlayer ? 'player' : 'opponent');
+    showDmgFloat(isPlayer ? 'player' : 'opponent', burnDmg, true);
+    log(`${battler.name} takes ${burnDmg} burn damage! (${battler.burnStacks} stack${battler.burnStacks>1?'s':''})`, 'status');
+    if (Math.random() < 0.5) {
+      battler.burnStacks--;
+      if (battler.burnStacks <= 0) log(`${battler.name}'s burn goes out!`, 'status');
+      else log(`  A burn stack fades. (${battler.burnStacks} left)`, 'status');
+    }
+    renderRoster(isPlayer ? 'player' : 'opponent');
+    if (battler.currentHp <= 0) { battler.fainted = true; animateFaint(battler); }
+  }
+
+  // Boomerang hits resolve
+  if (battler.boomerangHits.length > 0 && !battler.fainted) {
+    const hits = battler.boomerangHits.splice(0);
+    for (const hit of hits) {
+      if (battler.fainted) break;
+      battler.currentHp = Math.max(0, battler.currentHp - hit.damage);
+      updateHpBar(isPlayer ? 'player' : 'opponent');
+      showDmgFloat(isPlayer ? 'player' : 'opponent', hit.damage, true);
+      log(`${hit.source}'s ${hit.ability} swings back and hits ${battler.name} for ${hit.damage}!`, 'hit');
+      battler.damagedThisTurn = true;
+      if (battler.currentHp <= 0) { battler.fainted = true; animateFaint(battler); }
+    }
+    renderRoster(isPlayer ? 'player' : 'opponent');
+  }
 
   if (!battler.status) return;
   if (battler.status === 'poison') {
@@ -1630,10 +1745,16 @@ function pickAIAbility() {
   o.abilities.forEach((ab, i) => {
     if (ab.currentUses <= 0 || ab.heal) return;
     if (ab.requiresFrozen && player().status !== 'frozen') return;
-    const avgDmg = (ab.fixed || 0) + ab.dice[0] * (ab.dice[1] + 1) / 2;
-    const mult = 1;
-    let score = avgDmg * mult * (0.8 + Math.random() * 0.4);
-    if (ab.requiresFrozen && player().status === 'frozen') score *= 2;
+    if (ab.grantWhittle && o.whittleBoost >= 8) return; // Don't stack too high
+    let score;
+    if (ab.swerve) { score = (o.swerveLastTurn ? 5 : 20) * (0.8 + Math.random() * 0.4); }
+    else if (ab.grantWhittle) { score = (o.whittleBoost === 0 ? 25 : 15) * (0.8 + Math.random() * 0.4); }
+    else {
+      const avgDmg = (ab.fixed || 0) + ab.dice[0] * (ab.dice[1] + 1) / 2;
+      score = avgDmg * (0.8 + Math.random() * 0.4);
+      if (ab.requiresFrozen && player().status === 'frozen') score *= 2;
+      if (ab.boomerang) score *= 1.3; // Value delayed damage
+    }
     if (score > bestScore) { bestScore = score; best = i; }
   });
   if (best === -1) best = o.abilities.findIndex(a => a.currentUses > 0) || 0;
@@ -1650,10 +1771,16 @@ function pickSmartMove() {
   p.abilities.forEach((ab, i) => {
     if (ab.currentUses <= 0 || ab.heal) return;
     if (ab.requiresFrozen && opponent().status !== 'frozen') return;
-    const avgDmg = (ab.fixed || 0) + ab.dice[0] * (ab.dice[1] + 1) / 2;
-    const mult = 1;
-    let score = avgDmg * mult * (0.85 + Math.random() * 0.3);
-    if (ab.requiresFrozen && opponent().status === 'frozen') score *= 2;
+    if (ab.grantWhittle && p.whittleBoost >= 8) return;
+    let score;
+    if (ab.swerve) { score = (p.swerveLastTurn ? 5 : 20) * (0.85 + Math.random() * 0.3); }
+    else if (ab.grantWhittle) { score = (p.whittleBoost === 0 ? 25 : 15) * (0.85 + Math.random() * 0.3); }
+    else {
+      const avgDmg = (ab.fixed || 0) + ab.dice[0] * (ab.dice[1] + 1) / 2;
+      score = avgDmg * (0.85 + Math.random() * 0.3);
+      if (ab.requiresFrozen && opponent().status === 'frozen') score *= 2;
+      if (ab.boomerang) score *= 1.3;
+    }
     if (score > bestScore) { bestScore = score; best = i; }
   });
   if (best === -1) best = p.abilities.findIndex(a => a.currentUses > 0) || 0;

@@ -19,20 +19,43 @@ const ABILITIES = {
   healingPrayer:{ name:'Healing Prayer',  dmgType:'heal',     stat:'cha', fixed:0,  dice:[1,1],  uses:4,  healingPrayer:true, heal:true },
 };
 
+const STAT_BUDGET = 72, STAT_FLOOR = 5, STAT_CAP = 20;
+const STAT_NAMES = ['atk','def','con','int','cha','spd'];
+
+function generateStats(cls) {
+  if (cls.stats) return {...cls.stats};
+  const weights = cls.statWeights;
+  const stats = {};
+  STAT_NAMES.forEach(s => stats[s] = STAT_FLOOR);
+  let pool = STAT_BUDGET - STAT_FLOOR * STAT_NAMES.length;
+  const totalWeight = STAT_NAMES.reduce((sum, s) => sum + (weights[s] || 1), 0);
+  while (pool > 0) {
+    let r = Math.random() * totalWeight;
+    for (const s of STAT_NAMES) {
+      r -= (weights[s] || 1);
+      if (r <= 0) {
+        if (stats[s] < STAT_CAP) { stats[s]++; pool--; }
+        break;
+      }
+    }
+  }
+  return stats;
+}
+
 const CLASSES = [
-  { id:'sirShining', label:'Paladin', stats:{atk:14,spd:10,con:15,int:12,def:17,cha:16},
+  { id:'sirShining', label:'Paladin', statWeights:{atk:3,spd:1,con:3,int:1.5,def:4,cha:3.5},
     abilities:['radialStrike','makeWay','heavenlyBlow','healingPrayer'],
     stances: [
       { id:'battlefieldStar', name:'Battlefield Star', statBoosts:{cha:2}, passive:'blindPerTurn' },
       { id:'flashyArrival', name:'Flashy Arrival', statBoosts:{def:2}, passive:'flashyBlind' },
     ]},
-  { id:'pitDweller', label:'Berserker', stats:{atk:17,spd:9,con:16,int:6,def:12,cha:8},
+  { id:'pitDweller', label:'Berserker', statWeights:{atk:5,spd:1.5,con:4,int:0.5,def:2,cha:1},
     abilities:['tumpUp','counterThrow','subdue','deathLust'],
     stances: [
       { id:'dirtyBoxing', name:'Dirty Boxing', statBoosts:{con:2}, passive:'stunOnHit' },
       { id:'pitVeteran', name:'Pit Veteran', statBoosts:{def:2}, passive:'regenTick' },
     ]},
-  { id:'lich', label:'Mage', stats:{atk:6,spd:10,con:12,int:19,def:14,cha:14},
+  { id:'lich', label:'Mage', statWeights:{atk:0.5,spd:1.5,con:1.5,int:5,def:2.5,cha:3},
     abilities:['lichBlast','glaciate','lichLifeDrain','shatter'],
     stances: [
       { id:'arcticAura', name:'Arctic Aura', statBoosts:{con:2,cha:2}, passive:'freezeAll' },
@@ -43,8 +66,8 @@ const CLASSES = [
 const level = 8;
 
 function createCombatant(cls) {
-  const stats = {...cls.stats};
-  const hp = 20 + cls.stats.con * level * 0.5;
+  const stats = generateStats(cls);
+  const hp = 20 + stats.con * level * 0.5;
   const abilities = cls.abilities.map(id => ({...ABILITIES[id], id, currentUses: ABILITIES[id].uses}));
   return {
     cls, name: cls.label, stats, baseStats: {...stats},
@@ -232,6 +255,8 @@ function simulateBattle(cls1, cls2) {
       const hits = ability.multiHit || 1;
       for (let h = 0; h < hits; h++) {
         if (defender.currentHp <= 0) break;
+        // Tump Up second hit 30% miss
+        if (h > 0 && ability.multiHit && Math.random() < 0.3) continue;
 
         let dmg = calcDamage(ability, attacker, defender);
         if (h > 0 && ability.secondHitMult) dmg = Math.round(dmg * ability.secondHitMult);
