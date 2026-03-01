@@ -446,9 +446,9 @@ const ABILITIES = {
   remedialOintment:{ name:'Remedial Ointment', dmgType:'heal', stat:'cha', fixed:0, dice:[1,1], acc:99, uses:6, desc:'Remove all poison from yourself and heal 5 HP per stack removed.', remedialOintment:true, heal:true },
   violentExtraction:{ name:'Violent Extraction', dmgType:'soul', stat:'atk', fixed:0, dice:[1,1], acc:99, uses:6, desc:'Rip all poison from the enemy. Deals 10 soul damage per stack removed.', violentExtraction:true },
   // LEXILAS ABILITIES
-  recklessSwing: { name:'Reckless Swing', dmgType:'physical', stat:'atk', fixed:18, dice:[2,6], acc:0, uses:10, desc:'Devastating overhead swing. Deals 10% of damage dealt as recoil to self.', recklessSwing:true },
-  bladeToss:     { name:'Blade Toss',     dmgType:'physical', stat:'atk', fixed:12, dice:[1,6], acc:0, uses:12, desc:'Throw blade with extra speed this turn. Can\'t use Reckless Swing or Blade Toss next turn.', bladeToss:true },
-  lexShieldBash: { name:'Shield Bash',    dmgType:'physical', stat:'atk', fixed:7,  dice:[1,4], acc:1, uses:16, desc:'Brace with your shield then strike. Gain DEF, lose SPD for the turn. Chance to stun.', shieldBash:true, stunChance:0.25 },
+  recklessSwing: { name:'Reckless Swing', dmgType:'physical', stat:'atk', fixed:16, dice:[2,6], acc:0, uses:10, desc:'Devastating overhead swing. Deals 10% of damage dealt as recoil to self.', recklessSwing:true },
+  eviscerate:    { name:'Eviscerate',      dmgType:'physical', stat:'atk', fixed:8,  dice:[1,6], acc:0, uses:14, desc:'Slash deep. Medium physical damage. Applies a stack of Wounded (bonus soul damage after being hit, switching removes 1 stack).', eviscerate:true },
+  lexShieldBash: { name:'Shield Bash',    dmgType:'physical', stat:'atk', fixed:7,  dice:[1,4], acc:1, uses:16, desc:'Brace with your shield then strike. Gain DEF, lose SPD for the turn. 35% chance to stun.', shieldBash:true, stunChance:0.35 },
   chivalry:      { name:'Chivalry',       dmgType:'heal',     stat:'def', fixed:0,  dice:[1,1], acc:99, uses:6, desc:'Honour the duel. Always goes last. Heals 30% max HP if Lexilas didn\'t take damage this turn.', chivalry:true, heal:true },
 };
 
@@ -557,7 +557,7 @@ const CLASSES = [
     ]},
   { id:'lexilas', label:'Warrior', fixedName:'Lexilas', color:'#c4a035',
     statWeights:{atk:4,spd:2,con:3.5,int:0.5,def:3,cha:1},
-    abilities:['recklessSwing','bladeToss','lexShieldBash','chivalry'], sprite:'warrior',
+    abilities:['recklessSwing','eviscerate','lexShieldBash','chivalry'], sprite:'warrior',
     stances: [
       { id:'overwhelming', name:'Overwhelming', desc:'ATK+3. Enemy stance passive is suppressed while Lexilas is active.',
         statBoosts:{atk:3}, passive:'overwhelming' },
@@ -706,7 +706,7 @@ function createCombatant(cls, level) {
     switchLocked: false, deathLustTurns: 0, damagedThisTurn: false,
     blindStacks: 0, healingPrayerPending: false, makeWaySwitch: false, defBonusThisTurn: 0,
     boomerangHits: [], burnStacks: 0, swerveActive: false, swerveLastTurn: false, whittleBoost: 0, flinched: false, poisonStacks: 0,
-    bladeTossCooldown: false, duelistStacks: 0, shieldBashActive: false, shieldBashDef: 0, shieldBashSpd: 0,
+    bladeTossCooldown: false, duelistStacks: 0, shieldBashActive: false, shieldBashDef: 0, shieldBashSpd: 0, woundedStacks: 0,
     justSwitchedIn: false, overwhelmSuppressed: false, chivalryPending: false,
   };
 }
@@ -813,6 +813,7 @@ function renderStatusEffects(b) {
   if (b.flinched) html += `<span class="status-effect-tag" style="background:#4a3a1a;color:#ea8">😵 FLINCHED</span>`;
   if (b.swerveActive) html += `<span class="status-effect-tag" style="background:#1a3a2a;color:#8c8">💨 SWERVING</span>`;
   if (b.whittleBoost > 0) html += `<span class="status-effect-tag" style="background:#3a2a1a;color:#ca8">🔪 WHETTED (+${b.whittleBoost} ATK)</span>`;
+  if (b.woundedStacks > 0) html += `<span class="status-effect-tag" style="background:#4a1a2a;color:#e66">🩸 WOUNDED ×${b.woundedStacks}</span>`;
   return html ? `<div class="status-effects-row">${html}</div>` : '';
 }
 
@@ -1166,6 +1167,7 @@ async function doSwitch(newIdx) {
     oldP.deathLustTurns = 0; // Death Lust lost on switching
     if (oldP.whittleBoost) { oldP.stats.atk -= oldP.whittleBoost; oldP.whittleBoost = 0; } // Whittle lost on switching
     if (oldP.duelistStacks) { oldP.stats.atk -= oldP.duelistStacks; oldP.duelistStacks = 0; } // Duelist lost on switching
+    if (oldP.woundedStacks > 0) { oldP.woundedStacks--; log(`${oldP.name} shakes off a wound on switch-out (${oldP.woundedStacks} remaining).`, 'info'); }
     oldP.swerveActive = false; oldP.swerveLastTurn = false;
     oldP.bladeTossCooldown = false;
     removeStance(oldP);
@@ -1455,7 +1457,7 @@ async function executeAbility(attacker, defender, ability) {
     if (ability.healingPrayer) {
       const healAmt = Math.max(5, Math.floor(attacker.maxHp * 0.25));
       attacker.currentHp = Math.min(attacker.maxHp, attacker.currentHp + healAmt);
-      attacker.status = null; attacker.statusTurns = 0; attacker.blindStacks = 0; attacker.burnStacks = 0; attacker.poisonStacks = 0;
+      attacker.status = null; attacker.statusTurns = 0; attacker.blindStacks = 0; attacker.burnStacks = 0; attacker.poisonStacks = 0; attacker.woundedStacks = 0;
       updateHpBar(isPlayer ? 'player' : 'opponent');
       showDmgFloat(isPlayer ? 'player' : 'opponent', healAmt, false, true);
       log(`${atkName} uses Healing Prayer! Healed ${healAmt} HP and cured all statuses!`, 'heal');
@@ -1774,6 +1776,22 @@ async function executeAbility(attacker, defender, ability) {
         defender.flinched = true;
         log(`  ${defName} flinches! They lose their action this turn!`, 'status');
       }
+    }
+
+    // Eviscerate: apply Wounded stack
+    if (hitAbility.eviscerate && !defender.fainted && defender.currentHp > 0) {
+      defender.woundedStacks++;
+      log(`  ${defName} is wounded! (${defender.woundedStacks} stack${defender.woundedStacks>1?'s':''} — bonus soul damage on hit)`, 'status');
+      updateHpBar(!isPlayer ? 'player' : 'opponent');
+    }
+
+    // Wounded: bonus soul damage after being hit
+    if (defender.woundedStacks > 0 && dmg > 0 && !hitAbility.heal && !defender.fainted && defender.currentHp > 0) {
+      const woundDmg = defender.woundedStacks * 2;
+      defender.currentHp = Math.max(0, defender.currentHp - woundDmg);
+      updateHpBar(!isPlayer ? 'player' : 'opponent');
+      showDmgFloat(!isPlayer ? 'player' : 'opponent', woundDmg, false, false);
+      log(`  Wounds tear open! ${defName} takes ${woundDmg} bonus soul damage! (${defender.woundedStacks} stacks)`, 'damage');
     }
 
     // Reckless Swing: recoil damage to self (10% of damage dealt)
