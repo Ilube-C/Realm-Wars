@@ -479,7 +479,7 @@ const CLASSES = [
   { id:'monk', label:'Monk', color:'#aa8844',
     stats:{atk:10,spd:17,con:12,int:10,def:16,cha:8},
     abilities:['flurry','kiBlast','execute','meditation'], sprite:'monk' },
-  { id:'lich', label:'Lich', color:'#44ccdd',
+  { id:'lich', label:'Mage', fixedName:'Lich', color:'#44ccdd',
     stats:{atk:6,spd:10,con:12,int:19,def:14,cha:14},
     abilities:['lichBlast','glaciate','lichLifeDrain','shatter'], sprite:'lich',
     stances: [
@@ -591,7 +591,7 @@ function drawSprite(canvas, spriteKey, color, flipped) {
 function calcHP(con, level) { return 10 + mod(con) + (level - 1) * Math.max(1, 6 + mod(con)); }
 
 function createCombatant(cls, level) {
-  const name = pick(NAMES[cls.id] || NAMES.knight);
+  const name = cls.fixedName || pick(NAMES[cls.id] || NAMES.knight);
   const hp = calcHP(cls.stats.con, level);
   return {
     cls, name, level, 
@@ -889,8 +889,11 @@ function removeStance(combatant) {
   combatant.stance = null;
 }
 
+let stanceModalOpen = false;
 function showStanceModal(combatant) {
   return new Promise(resolve => {
+    if (stanceModalOpen) { resolve(aiPickStance(combatant)); return; }
+    stanceModalOpen = true;
     const modal = document.getElementById('stance-modal');
     const box = document.getElementById('stance-box');
     box.innerHTML = `<h3>Choose stance for ${combatant.name} the ${combatant.cls.label}</h3>`;
@@ -898,7 +901,7 @@ function showStanceModal(combatant) {
       const btn = document.createElement('button');
       btn.className = 'stance-btn';
       btn.innerHTML = `<div class="stance-name">${stance.name}</div><div class="stance-desc">${stance.desc}</div>`;
-      btn.onclick = () => { modal.classList.remove('show'); resolve(stance); };
+      btn.onclick = () => { modal.classList.remove('show'); stanceModalOpen = false; resolve(stance); };
       box.appendChild(btn);
     });
     modal.classList.add('show');
@@ -957,34 +960,38 @@ async function promptPlayerStance(combatant) {
 async function doSwitch(newIdx) {
   if (isAnimating || playerTeam[newIdx].fainted) return;
   isAnimating = true;
-  const oldP = player();
-  removeStance(oldP);
-  playerActive = newIdx;
-  log(`${oldP.name} withdraws! ${player().name} the ${player().cls.label} enters the battle!`, 'switch');
-  renderActiveInfo('player'); renderSprite('player'); renderRoster('player'); renderMoves();
+  try {
+    const oldP = player();
+    removeStance(oldP);
+    playerActive = newIdx;
+    // Always clear stance on the incoming character so they get a fresh pick
+    removeStance(player());
+    log(`${oldP.name} withdraws! ${player().name} the ${player().cls.label} enters the battle!`, 'switch');
+    renderActiveInfo('player'); renderSprite('player'); renderRoster('player'); renderMoves();
 
-  // Stance selection for new active
-  if (player().stances && !player().stance) {
-    if (autoMode) { applyStance(player(), aiPickStance(player())); }
-    else {
-      const stance = await showStanceModal(player());
-      applyStance(player(), stance);
-      log(`${player().name} enters ${stance.name} stance!`, 'info');
+    // Stance selection for new active
+    if (player().stances) {
+      if (autoMode) { applyStance(player(), aiPickStance(player())); }
+      else {
+        const stance = await showStanceModal(player());
+        applyStance(player(), stance);
+        log(`${player().name} enters ${stance.name} stance!`, 'info');
+      }
+      renderActiveInfo('player'); renderRoster('player'); renderMoves();
     }
-    renderActiveInfo('player'); renderRoster('player'); renderMoves();
+
+    // Opponent gets a free attack
+    await delay(400);
+    const oppAbIdx = pickAIAbility();
+    const oppAb = opponent().abilities[oppAbIdx]?.currentUses > 0 ? opponent().abilities[oppAbIdx] : STRUGGLE;
+    await executeAbility(opponent(), player(), oppAb);
+
+    if (player().fainted) { await handleFaint('player'); }
+    if (!opponent().fainted) await tickStatus(opponent());
+    if (!player().fainted) await tickStatus(player());
+  } finally {
+    isAnimating = false;
   }
-
-  // Opponent gets a free attack
-  await delay(400);
-  const oppAbIdx = pickAIAbility();
-  const oppAb = opponent().abilities[oppAbIdx]?.currentUses > 0 ? opponent().abilities[oppAbIdx] : STRUGGLE;
-  await executeAbility(opponent(), player(), oppAb);
-
-  if (player().fainted) { await handleFaint('player'); }
-  if (!opponent().fainted) await tickStatus(opponent());
-  if (!player().fainted) await tickStatus(player());
-
-  isAnimating = false;
   renderMoves(); renderRoster('player'); renderRoster('opponent');
   if (checkWin()) return;
   if (autoMode) scheduleAutoTurn();
@@ -996,41 +1003,42 @@ async function executeTurn(moveIdx) {
   if (isAnimating) return;
   isAnimating = true;
   hideTooltip();
+  try {
+    const p = player(), o = opponent();
+    const playerAb = p.abilities[moveIdx]?.currentUses > 0 ? p.abilities[moveIdx] : STRUGGLE;
+    const oppAbIdx = pickAIAbility();
+    const oppAb = o.abilities[oppAbIdx]?.currentUses > 0 ? o.abilities[oppAbIdx] : STRUGGLE;
 
-  const p = player(), o = opponent();
-  const playerAb = p.abilities[moveIdx]?.currentUses > 0 ? p.abilities[moveIdx] : STRUGGLE;
-  const oppAbIdx = pickAIAbility();
-  const oppAb = o.abilities[oppAbIdx]?.currentUses > 0 ? o.abilities[oppAbIdx] : STRUGGLE;
+    const pInit = getInitiative(p), oInit = getInitiative(o);
+    let first, second, firstAb, secondAb;
+    if (pInit >= oInit) { first = p; second = o; firstAb = playerAb; secondAb = oppAb; }
+    else { first = o; second = p; firstAb = oppAb; secondAb = playerAb; }
+    log(`Initiative: ${p.name} ${pInit} vs ${o.name} ${oInit}`, 'roll');
 
-  const pInit = getInitiative(p), oInit = getInitiative(o);
-  let first, second, firstAb, secondAb;
-  if (pInit >= oInit) { first = p; second = o; firstAb = playerAb; secondAb = oppAb; }
-  else { first = o; second = p; firstAb = oppAb; secondAb = playerAb; }
-  log(`Initiative: ${p.name} ${pInit} vs ${o.name} ${oInit}`, 'roll');
-
-  await executeAbility(first, second, firstAb);
-  if (second.fainted) await handleFaint(second === p ? 'player' : 'opponent');
-  if (first.fainted) await handleFaint(first === p ? 'player' : 'opponent');
-
-  if (checkWin()) { isAnimating = false; return; }
-
-  if (!second.fainted && !first.fainted) {
-    await delay(300);
-    await executeAbility(second, first, secondAb);
-    if (first.fainted) await handleFaint(first === p ? 'player' : 'opponent');
+    await executeAbility(first, second, firstAb);
     if (second.fainted) await handleFaint(second === p ? 'player' : 'opponent');
+    if (first.fainted) await handleFaint(first === p ? 'player' : 'opponent');
+
+    if (checkWin()) return;
+
+    if (!second.fainted && !first.fainted) {
+      await delay(300);
+      await executeAbility(second, first, secondAb);
+      if (first.fainted) await handleFaint(first === p ? 'player' : 'opponent');
+      if (second.fainted) await handleFaint(second === p ? 'player' : 'opponent');
+    }
+
+    if (checkWin()) return;
+
+    if (!player().fainted) await tickStatus(player());
+    if (!opponent().fainted) await tickStatus(opponent());
+    if (player().fainted) await handleFaint('player');
+    if (opponent().fainted) await handleFaint('opponent');
+
+    if (checkWin()) return;
+  } finally {
+    isAnimating = false;
   }
-
-  if (checkWin()) { isAnimating = false; return; }
-
-  if (!player().fainted) await tickStatus(player());
-  if (!opponent().fainted) await tickStatus(opponent());
-  if (player().fainted) await handleFaint('player');
-  if (opponent().fainted) await handleFaint('opponent');
-
-  if (checkWin()) { isAnimating = false; return; }
-
-  isAnimating = false;
   renderMoves(); renderRoster('player'); renderRoster('opponent');
   if (autoMode) scheduleAutoTurn();
 }
@@ -1234,8 +1242,9 @@ async function handleFaint(who) {
   log(`${next.name} the ${next.cls.label} enters the fight!`, 'switch');
   renderActiveInfo(who); renderSprite(who); renderRoster(who);
 
-  // Stance selection for new player character
-  if (who === 'player' && next.stances && !next.stance) {
+  // Stance selection for new character — always clear and re-prompt
+  if (who === 'player' && next.stances) {
+    removeStance(next); // clear any old stance
     if (autoMode) { applyStance(next, aiPickStance(next)); }
     else {
       const stance = await showStanceModal(next);
@@ -1243,6 +1252,10 @@ async function handleFaint(who) {
       log(`${next.name} enters ${stance.name} stance!`, 'info');
     }
     renderActiveInfo(who); renderRoster(who); renderMoves();
+  } else if (who === 'opponent' && next.stances) {
+    removeStance(next);
+    applyStance(next, aiPickStance(next));
+    renderActiveInfo(who); renderRoster(who);
   }
 
   await delay(400);
