@@ -129,6 +129,38 @@ body {
 .status-badge.slow { background: #1a2a4a; color: #68a; }
 .status-badge.frozen { background: #1a3a5a; color: #8ad; }
 
+/* Status Effects Row */
+.status-effects-row { display: flex; gap: 3px; margin-top: 3px; flex-wrap: wrap; }
+.status-effect-tag { display: inline-flex; align-items: center; gap: 2px; font-size: 9px; padding: 1px 5px; border-radius: 3px; font-weight: 700; }
+.status-effect-tag.poison { background: #2a4a1a; color: #6a4; }
+.status-effect-tag.stun { background: #4a4a1a; color: #aa8; }
+.status-effect-tag.slow { background: #1a2a4a; color: #68a; }
+.status-effect-tag.frozen { background: #1a3a5a; color: #8ad; }
+.roster-status { font-size: 8px; margin-top: 1px; }
+.roster-status .status-effect-tag { font-size: 7px; padding: 0 3px; }
+
+/* Death Selection Modal */
+#death-select-modal {
+  display: none; position: absolute; inset: 0; z-index: 100;
+  background: rgba(0,0,0,0.7); justify-content: center; align-items: center;
+}
+#death-select-modal.show { display: flex; }
+#death-select-modal .death-box {
+  background: linear-gradient(135deg, #1a1510, #2a2018); border: 2px solid #5a4a2a;
+  border-radius: 8px; padding: 16px; max-width: 420px; text-align: center;
+}
+#death-select-modal .death-box h3 { color: #cc5544; margin-bottom: 6px; font-size: 15px; }
+#death-select-modal .death-box p { color: #9a8a6a; font-size: 11px; margin-bottom: 10px; }
+#death-select-modal .char-btn {
+  display: block; width: 100%; margin: 5px 0; padding: 10px;
+  background: #2a2518; border: 2px solid #4a3a20; border-radius: 6px;
+  color: #d4c5a0; font-size: 12px; cursor: pointer; text-align: left;
+  transition: border-color 0.15s;
+}
+#death-select-modal .char-btn:hover { border-color: #aa8a4a; background: #3a3020; }
+#death-select-modal .char-name { font-weight: 700; font-size: 13px; }
+#death-select-modal .char-info { font-size: 10px; color: #9a8a6a; margin-top: 2px; }
+
 /* Stance Modal */
 #stance-modal {
   display: none; position: absolute; inset: 0; z-index: 100;
@@ -318,6 +350,7 @@ body {
 </div>
 <div id="tooltip"></div>
 <div id="stance-modal"><div class="stance-box" id="stance-box"></div></div>
+<div id="death-select-modal"><div class="death-box" id="death-box"></div></div>
 
 <script>
 // ============================================================
@@ -612,10 +645,28 @@ function attackRoll(attacker, ability, defenderDEF) {
   return { hit: nat === 20 || total >= defenderDEF, nat, total, crit };
 }
 
-function rollDamageForAbility(attacker, ability, crit) {
+function rollHealForAbility(attacker, ability) {
   const [count, sides] = ability.dice;
-  const dc = crit ? count * 2 : count;
-  return Math.max(1, rollDice(dc, sides) + ability.bonus + mod(attacker.stats[ability.stat]));
+  return Math.max(1, rollDice(count, sides) + ability.bonus + mod(attacker.stats[ability.stat]));
+}
+
+function rollDamageForAbility(attacker, defender, ability) {
+  const [count, sides] = ability.dice;
+  const baseDmg = rollDice(count, sides) + ability.bonus;
+  // Physical: ATK vs DEF, Magical (everything else): INT vs INT
+  let atkStat, defStat;
+  if (ability.dmgType === 'physical') {
+    atkStat = attacker.stats.atk;
+    defStat = defender.stats.def;
+  } else {
+    atkStat = attacker.stats.int;
+    defStat = defender.stats.int;
+  }
+  const atkRoll = rollDice(2, 6) + atkStat;
+  const defRoll = rollDice(2, 6) + defStat;
+  const multiplier = 0.5 + 0.5 * (atkRoll / defRoll);
+  const damage = Math.max(1, Math.floor(baseDmg * multiplier));
+  return { damage, baseDmg, atkRoll, defRoll, multiplier };
 }
 
 function getInitiative(c) { const base = d(20) + mod(c.stats.spd); return c.status === 'frozen' ? Math.floor(base * 0.4) : base; }
@@ -646,6 +697,15 @@ function log(text, cls='') {
 // ============================================================
 //  UI RENDERING
 // ============================================================
+const STATUS_ICONS = { poison: '☠', stun: '⚡', slow: '🐌', frozen: '❄' };
+
+function renderStatusEffects(b) {
+  if (!b.status) return '';
+  const icon = STATUS_ICONS[b.status] || '';
+  const turnsLeft = b.status === 'frozen' ? '' : ` (${b.statusTurns}t)`;
+  return `<div class="status-effects-row"><span class="status-effect-tag ${b.status}">${icon} ${b.status.toUpperCase()}${turnsLeft}</span></div>`;
+}
+
 function updateHpBar(who) {
   const b = who === 'player' ? player() : opponent();
   const bar = document.getElementById(who === 'player' ? 'player-hp-bar' : 'opp-hp-bar');
@@ -654,8 +714,7 @@ function updateHpBar(who) {
   bar.style.width = pct + '%';
   bar.className = 'hp-bar' + (pct < 25 ? ' red' : pct < 50 ? ' yellow' : '');
   let hp = Math.max(0, b.currentHp) + ' / ' + b.maxHp;
-  if (b.status) hp += ` <span class="status-badge ${b.status}">${b.status.toUpperCase()}</span>`;
-  text.innerHTML = hp;
+  text.innerHTML = hp + renderStatusEffects(b);
 }
 
 function renderActiveInfo(who) {
@@ -711,9 +770,10 @@ function renderRoster(who) {
     if (who === 'player' && !b.fainted && i !== activeIdx && !isAnimating) entry.classList.add('switchable');
     const pct = Math.max(0, b.currentHp / b.maxHp * 100);
     const barCls = pct < 25 ? 'red' : pct < 50 ? 'yellow' : '';
+    const statusHtml = b.status ? `<div class="roster-status"><span class="status-effect-tag ${b.status}">${STATUS_ICONS[b.status]||''} ${b.status.toUpperCase()}</span></div>` : '';
     entry.innerHTML = `<div class="roster-name" style="color:${b.cls.color}">${b.name}</div>
       <div class="roster-class">${b.cls.label} ${b.fainted ? '(KO)' : Math.max(0,b.currentHp)+'/'+b.maxHp}</div>
-      <div class="roster-hp-bar"><div class="roster-hp-fill ${barCls}" style="width:${pct}%"></div></div>`;
+      <div class="roster-hp-bar"><div class="roster-hp-fill ${barCls}" style="width:${pct}%"></div></div>${statusHtml}`;
     if (who === 'player' && !b.fainted && i !== activeIdx) {
       entry.onclick = () => { if (!isAnimating && !b.fainted) doSwitch(i); };
     }
@@ -725,21 +785,38 @@ function renderRoster(who) {
 //  TOOLTIP
 // ============================================================
 function calcMoveStats(ability, attacker) {
-  const statMod = mod(attacker.stats[ability.stat]);
   const [count, sides] = ability.dice;
-  const totalBonus = ability.bonus + statMod;
-  const minDmg = count + totalBonus;
-  const maxDmg = count * sides + totalBonus;
-  const avgDmg = count * (sides + 1) / 2 + totalBonus;
+  let totalBonus, minBase, maxBase, avgBase, atkStat, minDmg, maxDmg, avgDmg;
+  if (ability.heal) {
+    // Heals use old formula: dice + bonus + stat mod
+    const statMod = mod(attacker.stats[ability.stat]);
+    totalBonus = ability.bonus + statMod;
+    minBase = count + totalBonus;
+    maxBase = count * sides + totalBonus;
+    avgBase = count * (sides + 1) / 2 + totalBonus;
+    atkStat = attacker.stats[ability.stat];
+    minDmg = Math.max(1, minBase);
+    maxDmg = maxBase;
+    avgDmg = avgBase;
+  } else {
+    totalBonus = ability.bonus;
+    minBase = count + totalBonus;
+    maxBase = count * sides + totalBonus;
+    avgBase = count * (sides + 1) / 2 + totalBonus;
+    atkStat = ability.dmgType === 'physical' ? attacker.stats.atk : attacker.stats.int;
+    minDmg = Math.max(1, Math.floor(minBase * 0.5));
+    maxDmg = Math.ceil(maxBase * 1.5);
+    avgDmg = avgBase;
+  }
   const variance = count * (sides * sides - 1) / 12;
   const stdDev = Math.sqrt(variance);
-  const cv = avgDmg > 0 ? stdDev / avgDmg : 0;
+  const cv = avgBase > 0 ? stdDev / avgBase : 0;
   let varLabel, varClass;
   if (cv < 0.22) { varLabel = 'Low (Consistent)'; varClass = 'low'; }
   else if (cv < 0.35) { varLabel = 'Medium (Moderate)'; varClass = 'med'; }
   else if (cv < 0.48) { varLabel = 'High (Volatile)'; varClass = 'high'; }
   else { varLabel = 'Extreme (Chaotic)'; varClass = 'extreme'; }
-  return { minDmg: Math.max(1, minDmg), maxDmg, avgDmg: avgDmg.toFixed(1), varLabel, varClass, totalBonus, stdDev };
+  return { minDmg, maxDmg, avgDmg: avgDmg.toFixed(1), varLabel, varClass, totalBonus, stdDev, atkStat };
 }
 
 function showTooltip(btn, ability) {
@@ -774,7 +851,7 @@ function showTooltip(btn, ability) {
     <span class="tt-type ${ability.dmgType}">${typeIcon} ${typeLabel}</span>
     <div class="tt-stats">
       <div class="tt-stat"><span class="tt-stat-label">Dice</span><span class="tt-stat-val">${diceStr}</span></div>
-      <div class="tt-stat"><span class="tt-stat-label">Accuracy</span><span class="tt-stat-val">${ability.acc === 99 ? 'Auto-hit' : (ability.acc >= 0 ? '+' : '') + ability.acc}</span></div>
+      <div class="tt-stat"><span class="tt-stat-label">${ability.heal ? 'Stat' : 'Scaling'}</span><span class="tt-stat-val">${ability.heal ? ability.stat.toUpperCase() : (ability.dmgType === 'physical' ? 'ATK vs DEF' : 'INT vs INT') + ' (' + (ability.dmgType === 'physical' ? 'ATK' : 'INT') + ': ' + s.atkStat + ')'}</span></div>
       <div class="tt-stat"><span class="tt-stat-label">Uses</span><span class="tt-stat-val">${ability.currentUses} / ${ability.uses}</span></div>
       ${drainNote}${effectNote}${freezeNote}${frozenReq}
     </div>
@@ -815,7 +892,8 @@ function renderMoves() {
       if (eff > 1) effHint = ' [SUPER!]';
       else if (eff < 1) effHint = ' [RESIST]';
     }
-    btn.innerHTML = `<span class="move-name">${ab.name}${effHint}</span><span class="move-info">${tag} | ${diceStr} | ${ab.currentUses}/${ab.uses}</span>`;
+    const scaleInfo = ab.heal ? ab.stat.toUpperCase() : (ab.dmgType === 'physical' ? 'ATK' : 'INT');
+    btn.innerHTML = `<span class="move-name">${ab.name}${effHint}</span><span class="move-info">${tag} | ${diceStr} | ${scaleInfo} | ${ab.currentUses}/${ab.uses}</span>`;
     btn.disabled = ab.currentUses <= 0 || isAnimating || (ab.requiresFrozen && (!opponent() || opponent().status !== 'frozen'));
     btn.onclick = () => executeTurn(i);
     btn.onmouseenter = () => showTooltip(btn, ab);
@@ -1040,7 +1118,7 @@ async function executeAbility(attacker, defender, ability) {
   }
 
   if (ability.heal) {
-    const heal = rollDamageForAbility(attacker, ability, false);
+    const heal = rollHealForAbility(attacker, ability);
     attacker.currentHp = Math.min(attacker.maxHp, attacker.currentHp + heal);
     updateHpBar(isPlayer ? 'player' : 'opponent');
     showDmgFloat(isPlayer ? 'player' : 'opponent', heal, false, true);
@@ -1050,22 +1128,22 @@ async function executeAbility(attacker, defender, ability) {
   }
 
   log(`${atkName} uses ${ability.name}!`);
-  const roll = attackRoll(attacker, ability, 10 + mod(defender.stats.def));
   const atkSprite = document.getElementById(isPlayer ? 'player-sprite' : 'opp-sprite');
   const defSprite = document.getElementById(isPlayer ? 'opp-sprite' : 'player-sprite');
 
   atkSprite.classList.add('attacking'); await delay(150); atkSprite.classList.remove('attacking');
-
-  if (!roll.hit) {
-    log(`  Roll: ${roll.nat} + mods = ${roll.total} vs DEF ${10 + mod(defender.stats.def)} - Miss!`, 'miss');
-    return;
-  }
-
   defSprite.classList.add('hit'); await delay(300); defSprite.classList.remove('hit');
 
-  let dmg = rollDamageForAbility(attacker, ability, roll.crit);
+  // New damage formula: (fixed + NdX) × (0.5 + 0.5 × (2d6 + ATK) / (2d6 + DEF))
+  // Physical uses ATK vs DEF, everything else uses INT vs INT
+  const result = rollDamageForAbility(attacker, defender, ability);
+  let dmg = result.damage;
   const mult = getEffectiveness(ability.dmgType, defender.cls.resist, defender.cls.vuln);
   dmg = Math.max(1, Math.floor(dmg * mult));
+
+  const statLabel = ability.dmgType === 'physical' ? 'ATK' : 'INT';
+  const defLabel = ability.dmgType === 'physical' ? 'DEF' : 'INT';
+  log(`  Base: ${result.baseDmg}, Roll: 2d6+${statLabel}=${result.atkRoll} vs 2d6+${defLabel}=${result.defRoll} (×${result.multiplier.toFixed(2)})`, 'roll');
 
   // Frozen target takes reduced damage but thaws
   if (defender.status === 'frozen' && !ability.requiresFrozen) {
@@ -1075,15 +1153,13 @@ async function executeAbility(attacker, defender, ability) {
     updateHpBar(!isPlayer ? 'player' : 'opponent');
   }
 
-  const rollStr = roll.nat === 20 ? 'NAT 20!' : `${roll.nat} + mods = ${roll.total}`;
-  log(`  Roll: ${rollStr} vs DEF ${10 + mod(defender.stats.def)} - Hit!`, 'roll');
-  if (roll.crit) log(`  CRITICAL HIT!`, 'crit');
+  const isBigHit = result.multiplier >= 1.2;
   if (mult > 1) log(`  Super effective vs ${defName}!`, 'vuln');
   if (mult < 1) log(`  ${defName} resists ${ability.dmgType}.`, 'resist');
 
   defender.currentHp = Math.max(0, defender.currentHp - dmg);
   updateHpBar(!isPlayer ? 'player' : 'opponent');
-  showDmgFloat(!isPlayer ? 'player' : 'opponent', dmg, roll.crit, false);
+  showDmgFloat(!isPlayer ? 'player' : 'opponent', dmg, isBigHit, false);
   log(`  ${defName} takes ${dmg} ${ability.dmgType} damage!`, 'damage');
   renderRoster(!isPlayer ? 'player' : 'opponent');
 
@@ -1113,7 +1189,7 @@ async function executeAbility(attacker, defender, ability) {
     let freezeChance = ability.freezeChance || 0;
     if (attacker.stance && attacker.stance.passive === 'freezeAll') freezeChance += 0.1;
     if (freezeChance > 0 && Math.random() < freezeChance) {
-      defender.status = 'frozen'; defender.statusTurns = 99; // frozen doesn't use turn countdown
+      defender.status = 'frozen'; defender.statusTurns = 99;
       log(`  ${defName} is frozen solid!`, 'status');
       updateHpBar(!isPlayer ? 'player' : 'opponent');
     }
@@ -1157,6 +1233,26 @@ function animateFaint(b) {
   document.getElementById(isPlayer ? 'player-sprite' : 'opp-sprite').classList.add('fainted');
 }
 
+function showDeathSelectionModal(team, activeIdx) {
+  return new Promise(resolve => {
+    const modal = document.getElementById('death-select-modal');
+    const box = document.getElementById('death-box');
+    box.innerHTML = `<h3>${team[activeIdx].name} has fallen!</h3><p>Choose your next fighter:</p>`;
+    team.forEach((b, i) => {
+      if (i === activeIdx || b.fainted) return;
+      const pct = Math.max(0, b.currentHp / b.maxHp * 100);
+      const statusStr = b.status ? ` [${b.status.toUpperCase()}]` : '';
+      const btn = document.createElement('button');
+      btn.className = 'char-btn';
+      btn.innerHTML = `<div class="char-name" style="color:${b.cls.color}">${b.name} the ${b.cls.label}${statusStr}</div>
+        <div class="char-info">HP: ${b.currentHp}/${b.maxHp} (${Math.round(pct)}%) | ATK ${b.stats.atk} DEF ${b.stats.def} INT ${b.stats.int} SPD ${b.stats.spd}</div>`;
+      btn.onclick = () => { modal.classList.remove('show'); resolve(i); };
+      box.appendChild(btn);
+    });
+    modal.classList.add('show');
+  });
+}
+
 async function handleFaint(who) {
   const team = who === 'player' ? playerTeam : oppTeam;
   const active = who === 'player' ? playerActive : oppActive;
@@ -1169,15 +1265,37 @@ async function handleFaint(who) {
 
   await delay(600);
 
-  const nextIdx = team.findIndex((t, i) => i !== active && !t.fainted);
-  if (nextIdx >= 0) {
-    if (who === 'player') playerActive = nextIdx;
-    else oppActive = nextIdx;
-    const next = who === 'player' ? player() : opponent();
-    log(`${next.name} the ${next.cls.label} enters the fight!`, 'switch');
-    renderActiveInfo(who); renderSprite(who); renderRoster(who);
-    await delay(400);
+  const alive = team.filter((t, i) => i !== active && !t.fainted);
+  if (alive.length === 0) return;
+
+  let nextIdx;
+  if (who === 'player' && !autoMode) {
+    // Player picks their next character
+    nextIdx = await showDeathSelectionModal(team, active);
+  } else {
+    // AI picks randomly from alive characters
+    const aliveIndices = team.map((t, i) => i).filter(i => i !== active && !team[i].fainted);
+    nextIdx = pick(aliveIndices);
   }
+
+  if (who === 'player') playerActive = nextIdx;
+  else oppActive = nextIdx;
+  const next = who === 'player' ? player() : opponent();
+  log(`${next.name} the ${next.cls.label} enters the fight!`, 'switch');
+  renderActiveInfo(who); renderSprite(who); renderRoster(who);
+
+  // Stance selection for new player character
+  if (who === 'player' && next.stances && !next.stance) {
+    if (autoMode) { applyStance(next, aiPickStance(next)); }
+    else {
+      const stance = await showStanceModal(next);
+      applyStance(next, stance);
+      log(`${next.name} enters ${stance.name} stance!`, 'info');
+    }
+    renderActiveInfo(who); renderRoster(who); renderMoves();
+  }
+
+  await delay(400);
 }
 
 function checkWin() {
