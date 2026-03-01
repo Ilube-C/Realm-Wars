@@ -1258,20 +1258,12 @@ async function executeAbility(attacker, defender, ability) {
 
   // Execute the hit(s)
   if (ability.doubleHit) {
-    // Tump Up: first hit normal, second hit harder but can miss
+    // Tump Up: first hit normal, second hit deals more damage
     await dealHit(ability, 'First hit');
     if (!defender.fainted) {
       await delay(200);
-      // Second hit: +50% fixed damage but needs an attack roll
       const secondHitAbility = {...ability, fixed: Math.floor((ability.fixed || 0) * 1.5), doubleHit: false};
-      const roll = attackRoll(attacker, {acc: -1, stat: ability.stat}, defender.stats.def);
-      if (roll.hit) {
-        log(`  Second hit connects! (rolled ${roll.nat})`, 'roll');
-        await dealHit(secondHitAbility, 'Second hit');
-      } else {
-        log(`  Second hit misses! (rolled ${roll.nat})`, 'miss');
-        atkSprite.classList.add('attacking'); await delay(150); atkSprite.classList.remove('attacking');
-      }
+      await dealHit(secondHitAbility, 'Second hit');
     }
   } else {
     await dealHit(ability);
