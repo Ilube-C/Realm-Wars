@@ -11,7 +11,7 @@ const AB={
   subdue:{t:'p',s:'atk',f:11,dc:[1,6],u:12,sl:1},deathLust:{t:'p',s:'atk',f:6,dc:[1,4],u:4,gdl:1},
   radialStrike:{t:'p',s:'atk',f:8,dc:[1,6],u:16,bc:0.4},heavenlyBlow:{t:'p',s:'atk',f:7,dc:[1,8],u:10,sd:1},
   healingPrayer:{t:'h',s:'cha',f:0,dc:[1,1],u:4,hp:1,hl:1},
-  battlerang:{t:'p',s:'atk',f:7,dc:[1,6],u:14,bm:1,fl:0.25},emberang:{t:'p',s:'atk',f:4,dc:[1,6],u:12,bm:1,bn:0.35},
+  battlerang:{t:'p',s:'atk',f:8,dc:[1,6],u:14,bm:1,fl:0.25},emberang:{t:'p',s:'atk',f:5,dc:[1,6],u:12,bm:1,bn:0.35},
   whittle:{t:'p',s:'atk',f:4,dc:[1,4],u:4,gw:1},swerve:{t:'p',s:'atk',f:0,dc:[1,1],u:10,sw:1},
   poisonDart:{t:'p',s:'atk',f:7,dc:[1,6],u:14,pc:1.00,pst:2},goblinGas:{t:'p',s:'atk',f:0,dc:[1,1],u:4,gg:1},
   remedialOintment:{t:'h',s:'cha',f:0,dc:[1,1],u:6,ro:1,hl:1},violentExtraction:{t:'s',s:'atk',f:0,dc:[1,1],u:6,ve:1},
