@@ -35,7 +35,7 @@ const ABILITIES = {
   makeWay:      { name:'Make Way',        dmgType:'physical', stat:'atk', fixed:5,  dice:[1,4],  uses:6,  makeWay:true },
   heavenlyBlow: { name:'Heavenly Blow',   dmgType:'physical', stat:'atk', fixed:8,  dice:[1,8],  uses:10, splitDamage:true },
   healingPrayer:{ name:'Healing Prayer',  dmgType:'heal',     stat:'cha', fixed:0,  dice:[1,1],  uses:4,  healingPrayer:true, heal:true },
-  battlerang:   { name:'Battlerang',      dmgType:'physical', stat:'atk', fixed:8,  dice:[1,6],  uses:14, boomerang:true },
+  battlerang:   { name:'Battlerang',      dmgType:'physical', stat:'atk', fixed:8,  dice:[1,6],  uses:14, boomerang:true, flinchChance:0.25 },
   emberang:     { name:'Emberang',        dmgType:'physical', stat:'atk', fixed:5,  dice:[1,6],  uses:12, boomerang:true, burnChance:0.35 },
   whittle:      { name:'Whittle',         dmgType:'physical', stat:'atk', fixed:4,  dice:[1,4],  uses:4,  grantWhittle:true },
   swerve:       { name:'Swerve',          dmgType:'physical', stat:'atk', fixed:0,  dice:[1,1],  uses:10, swerve:true },
@@ -85,7 +85,7 @@ function createCombatant(cls) {
     status: null, statusTurns: 0, fainted: false,
     switchLocked: false, deathLustTurns: 0, damagedThisTurn: false,
     blindStacks: 0, healingPrayerPending: false, makeWaySwitch: false, defBonusThisTurn: 0,
-    boomerangHits: [], burnStacks: 0, swerveActive: false, swerveLastTurn: false, whittleBoost: 0,
+    boomerangHits: [], burnStacks: 0, swerveActive: false, swerveLastTurn: false, whittleBoost: 0, flinched: false,
   };
 }
 
@@ -199,8 +199,8 @@ function simulateBattle(cls1, cls2) {
         if (stunDebuffs) for (const [s,v] of Object.entries(stunDebuffs)) attacker.stats[s] += v;
       };
 
-      // Frozen check
-      if (attacker.status === 'frozen') {
+      // Frozen check (Healing Prayer bypasses)
+      if (attacker.status === 'frozen' && !ability.healingPrayer) {
         if (Math.random() < 0.66) { restoreStats(); return; }
       }
 
@@ -227,9 +227,10 @@ function simulateBattle(cls1, cls2) {
       // Swerve - no damage
       if (ability.swerve) { ability.currentUses--; restoreStats(); return; }
 
-      // Healing Prayer
+      // Healing Prayer (instant)
       if (ability.heal && ability.healingPrayer) {
-        attacker.healingPrayerPending = true;
+        attacker.currentHp = Math.min(attacker.maxHp, attacker.currentHp + Math.max(5, Math.round(attacker.maxHp * 0.25)));
+        attacker.status = null; attacker.statusTurns = 0; attacker.blindStacks = 0; attacker.burnStacks = 0;
         ability.currentUses--;
         restoreStats();
         return;
@@ -322,22 +323,24 @@ function simulateBattle(cls1, cls2) {
           const bonusMult = attacker.stance?.passive === 'boomerangBonus' ? 1.3 : 1.0;
           defender.boomerangHits.push({ damage: Math.round(dmg * 1.0 * bonusMult), source: attacker.name });
         }
+
+        // Flinch (only first hit)
+        if (h === 0 && ability.flinchChance && defender.currentHp > 0 && !defender.flinched) {
+          const fChance = ability.flinchChance + Math.max(0, (attacker.stats.cha - defender.stats.cha)) * 0.02;
+          if (Math.random() < fChance) defender.flinched = true;
+        }
       }
 
       restoreStats();
     }
 
     executeHit(first, second, firstMove);
-    executeHit(second, first, secondMove);
+    if (!second.flinched) executeHit(second, first, secondMove);
+    first.flinched = false;
+    second.flinched = false;
 
     // End of turn
     for (const fighter of [a, b]) {
-      // Healing Prayer
-      if (fighter.healingPrayerPending && fighter.currentHp > 0) {
-        fighter.currentHp = Math.min(fighter.maxHp, fighter.currentHp + Math.round(fighter.maxHp * 0.25));
-        fighter.status = null; fighter.statusTurns = 0; fighter.blindStacks = 0; fighter.burnStacks = 0;
-        fighter.healingPrayerPending = false;
-      }
       // Regen
       if (fighter.stance?.passive === 'regenTick' && fighter.currentHp > 0) {
         fighter.currentHp = Math.min(fighter.maxHp, fighter.currentHp + Math.round(fighter.maxHp * 0.05));

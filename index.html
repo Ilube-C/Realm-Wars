@@ -1288,14 +1288,19 @@ async function executeAbility(attacker, defender, ability) {
     if (attacker.statusTurns <= 0) { attacker.status = null; }
   }
   if (attacker.status === 'frozen') {
-    const roll = Math.random();
-    if (roll < 0.333) {
-      attacker.status = null; attacker.statusTurns = 0;
-      log(`${atkName} thaws out and acts!`, 'status');
-      updateHpBar(isPlayer ? 'player' : 'opponent');
+    // Healing Prayer bypasses frozen inaction
+    if (ability.healingPrayer) {
+      log(`${atkName} wills through the ice with a Healing Prayer!`, 'status');
     } else {
-      log(`${atkName} is frozen solid and can't move!`, 'status');
-      return;
+      const roll = Math.random();
+      if (roll < 0.333) {
+        attacker.status = null; attacker.statusTurns = 0;
+        log(`${atkName} thaws out and acts!`, 'status');
+        updateHpBar(isPlayer ? 'player' : 'opponent');
+      } else {
+        log(`${atkName} is frozen solid and can't move!`, 'status');
+        return;
+      }
     }
   }
   if (attacker.status === 'slow' && Math.random() < 0.33) {
