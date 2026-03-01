@@ -2647,7 +2647,7 @@ function pickAIAbility() {
     else if (ab.swerve) { score = (o.swerveLastTurn ? 5 : 20) * (0.8 + Math.random() * 0.4); }
     else if (ab.grantWhittle) { score = (o.whittleBoost === 0 ? 25 : 15) * (0.8 + Math.random() * 0.4); }
     else if (ab.goblinGas) { score = (!terrain ? 30 : 3) * (0.8 + Math.random() * 0.4); } // High priority opener
-    else if (ab.violentExtraction) { score = (player().poisonStacks >= 3 ? player().poisonStacks * 10 : 1) * (0.8 + Math.random() * 0.4); } // Cash out at 3+ stacks
+    else if (ab.violentExtraction) { const veDmg = player().poisonStacks * 15; score = (veDmg >= player().currentHp ? 999 : player().poisonStacks >= 3 ? player().poisonStacks * 10 : 1) * (0.8 + Math.random() * 0.4); } // Instant use if lethal, else 3+ stacks
     else if (ab.remedialOintment) { score = (o.poisonStacks >= 2 ? o.poisonStacks * 6 : 0) * (0.8 + Math.random() * 0.4); } // Proactive sustain
     else if (ab.ancientPower) { score = 22 * (0.8 + Math.random() * 0.4); } // High delayed damage
     else if (ab.transference) { score = ((o.poisonStacks + o.burnStacks + o.blindStacks + o.woundedStacks) * 6 + (o.status ? 15 : 0)) * (0.8 + Math.random() * 0.4); }
@@ -2687,7 +2687,7 @@ function pickSmartMove() {
     else if (ab.swerve) { score = (p.swerveLastTurn ? 5 : 20) * (0.85 + Math.random() * 0.3); }
     else if (ab.grantWhittle) { score = (p.whittleBoost === 0 ? 25 : 15) * (0.85 + Math.random() * 0.3); }
     else if (ab.goblinGas) { score = (!terrain ? 25 : 3) * (0.85 + Math.random() * 0.3); }
-    else if (ab.violentExtraction) { score = (opponent().poisonStacks >= 3 ? opponent().poisonStacks * 10 : 1) * (0.85 + Math.random() * 0.3); }
+    else if (ab.violentExtraction) { const veDmg = opponent().poisonStacks * 15; score = (veDmg >= opponent().currentHp ? 999 : opponent().poisonStacks >= 3 ? opponent().poisonStacks * 10 : 1) * (0.85 + Math.random() * 0.3); }
     else if (ab.remedialOintment) { score = (p.poisonStacks >= 2 ? p.poisonStacks * 6 : 0) * (0.85 + Math.random() * 0.3); }
     else if (ab.ancientPower) { score = 22 * (0.85 + Math.random() * 0.3); }
     else if (ab.transference) { score = ((p.poisonStacks + p.burnStacks + p.blindStacks + p.woundedStacks) * 6 + (p.status ? 15 : 0)) * (0.85 + Math.random() * 0.3); }
