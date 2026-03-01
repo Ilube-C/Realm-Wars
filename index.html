@@ -446,8 +446,8 @@ const ABILITIES = {
   remedialOintment:{ name:'Remedial Ointment', dmgType:'heal', stat:'cha', fixed:0, dice:[1,1], acc:99, uses:6, desc:'Remove all poison from yourself and heal 5 HP per stack removed.', remedialOintment:true, heal:true },
   violentExtraction:{ name:'Violent Extraction', dmgType:'soul', stat:'atk', fixed:0, dice:[1,1], acc:99, uses:6, desc:'Rip all poison from the enemy. Deals 12 soul damage per stack removed.', violentExtraction:true },
   // VINY THE YOUNGER ABILITIES
-  petalStorm:   { name:'Petal Storm',    dmgType:'magical',  stat:'int', fixed:4,  dice:[1,4],  acc:0,  uses:14, desc:'Whirl of sharp petals. Small magic damage and applies a stack of blind.', petalStorm:true },
-  battleBoar:   { name:'Battle Boar',    dmgType:'physical', stat:'int', fixed:0,  dice:[1,1],  acc:99, uses:2,  desc:'Summon a Battle Boar to replace you. The boar fights in your place but dies if switched out.', summonBoar:true },
+  petalStorm:   { name:'Petal Storm',    dmgType:'magical',  stat:'int', fixed:4,  dice:[1,4],  acc:0,  uses:14, desc:'Whirl of sharp petals. Small magic damage with 50% chance (+CHA) to apply a blind stack.', petalStorm:true, blindChance:0.50 },
+  battleBoar:   { name:'Battle Boar',    dmgType:'physical', stat:'int', fixed:0,  dice:[1,1],  acc:99, uses:2,  desc:'Summon a Battle Boar to replace you. Reduced speed — you take a hit first. The boar fights in your place but dies if switched out.', summonBoar:true, reducedPriority:true },
   ancientPower: { name:'Ancient Power',  dmgType:'magical',  stat:'int', fixed:14, dice:[2,6],  acc:0,  uses:6,  desc:'Channel ancient magic. Deals high magic damage at the end of 2 turns.', ancientPower:true },
   transference: { name:'Transference',   dmgType:'soul',     stat:'int', fixed:0,  dice:[1,1],  acc:99, uses:4,  desc:'Transfer all your status effects and stacks to the enemy. Ignores frozen inaction.', transference:true },
   // BATTLE BOAR ABILITIES
@@ -1305,6 +1305,9 @@ async function executeTurn(moveIdx) {
     // Chivalry: greatly reduced priority (always goes last)
     if (playerAb.chivalry) pInit = -100;
     if (oppAb.chivalry) oInit = -100;
+    // Battle Boar: reduced priority (Druid tanks a hit before summoning)
+    if (playerAb.reducedPriority) pInit = -50;
+    if (oppAb.reducedPriority) oInit = -50;
     // Shield Bash: +DEF, -SPD for the turn
     if (playerAb.shieldBash) { p.shieldBashDef = 4; p.shieldBashSpd = Math.floor(p.stats.spd * 0.4); p.stats.def += 4; p.stats.spd -= p.shieldBashSpd; p.shieldBashActive = true; }
     if (oppAb.shieldBash) { o.shieldBashDef = 4; o.shieldBashSpd = Math.floor(o.stats.spd * 0.4); o.stats.def += 4; o.stats.spd -= o.shieldBashSpd; o.shieldBashActive = true; }
@@ -1990,10 +1993,13 @@ async function executeAbility(attacker, defender, ability) {
       log(`  Duelist! ${atkName} gains +5 ATK (total +${attacker.duelistStacks} stacked)!`, 'status');
     }
 
-    // Petal Storm: apply 1 blind stack on hit
-    if (hitAbility.petalStorm && dmg > 0 && !defender.fainted && defender.currentHp > 0) {
-      defender.blindStacks += 1;
-      log(`  Petals blind ${defName}! (${defender.blindStacks} stack${defender.blindStacks>1?'s':''}, ${defender.blindStacks*15}% miss)`, 'status');
+    // Petal Storm: chance to apply 1 blind stack on hit
+    if (hitAbility.petalStorm && hitAbility.blindChance && dmg > 0 && !defender.fainted && defender.currentHp > 0) {
+      const bChance = hitAbility.blindChance + Math.max(0, (attacker.stats.cha - defender.stats.cha)) * 0.02;
+      if (Math.random() < bChance) {
+        defender.blindStacks += 1;
+        log(`  Petals blind ${defName}! (${defender.blindStacks} stack${defender.blindStacks>1?'s':''}, ${defender.blindStacks*15}% miss)`, 'status');
+      }
       updateHpBar(!isPlayer ? 'player' : 'opponent');
     }
 
@@ -2177,10 +2183,27 @@ async function handleFaint(who) {
   const deathLines = ['collapses!','crumples in defeat!','falls lifeless!','is vanquished!'];
   log(`${b.name} ${pick(deathLines)}`, 'faint');
 
-  // If a summon faints, restore the owner to that slot
+  // If a summon faints, restore the owner to that slot — they re-enter the fight
   if (b.isSummon && b.summonOwner) {
-    team[active] = b.summonOwner;
-    log(`${b.summonOwner.name} returns from the sidelines!`, 'switch');
+    const owner = b.summonOwner;
+    team[active] = owner;
+    log(`${owner.name} returns from the sidelines!`, 'switch');
+    owner.justSwitchedIn = true;
+    renderRoster(who); renderActiveInfo(who); renderSprite(who);
+    if (who === 'player') renderMoves();
+    // Stance re-selection for the returning Druid
+    if (owner.stances) {
+      removeStance(owner);
+      if (who === 'opponent' || autoMode) { applyStance(owner, aiPickStance(owner)); }
+      else {
+        const stance = await showStanceModal(owner);
+        applyStance(owner, stance);
+        log(`${owner.name} enters ${stance.name} stance! ${stance.desc}`, 'info');
+      }
+      renderActiveInfo(who); renderRoster(who);
+      if (who === 'player') renderMoves();
+    }
+    return; // Owner takes over the slot — no need to pick another character
   }
 
   renderRoster(who);
