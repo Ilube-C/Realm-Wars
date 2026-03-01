@@ -22,7 +22,7 @@ const ABILITIES = {
   lichBlast:    { name:'Lich Blast',      dmgType:'magical',  stat:'int', fixed:8,  dice:[2,6],  uses:14, freezeChance:0.2 },
   glaciate:     { name:'Glaciate',        dmgType:'magical',  stat:'int', fixed:5,  dice:[1,4],  uses:16, freezeChance:0.6 },
   lichLifeDrain:{ name:'Life Drain',      dmgType:'soul',     stat:'int', fixed:7,  dice:[1,8],  uses:10, drain:0.5 },
-  shatter:      { name:'Shatter',         dmgType:'physical', stat:'atk', fixed:16, dice:[2,8],  uses:6,  requiresFrozen:true },
+  shatter:      { name:'Shatter',         dmgType:'physical', stat:'atk', fixed:22, dice:[2,8],  uses:6,  requiresFrozen:true },
   tumpUp:       { name:'Tump Up',         dmgType:'physical', stat:'atk', fixed:5,  dice:[1,6],  uses:16, doubleHit:true },
   counterThrow: { name:'Counter Throw',   dmgType:'physical', stat:'atk', fixed:7,  dice:[1,6],  uses:10, counterMove:true, counterBonus:0.75 },
   subdue:       { name:'Subdue',          dmgType:'physical', stat:'atk', fixed:12, dice:[1,6],  uses:12, switchLock:true },
@@ -41,7 +41,7 @@ const CLASSES = [
   { id:'sirShining', label:'Paladin', statWeights:{atk:3,spd:1,con:3,int:1.5,def:4,cha:3.5},
     abilities:['radialStrike','makeWay','heavenlyBlow','healingPrayer'],
     stances: [{ id:'battlefieldStar', statBoosts:{cha:2}, passive:'blindPerTurn' }, { id:'flashyArrival', statBoosts:{def:2}, passive:'flashyBlind' }]},
-  { id:'pitDweller', label:'Berserker', statWeights:{atk:5,spd:1.5,con:3,int:0.5,def:2,cha:1},
+  { id:'pitDweller', label:'Berserker', statWeights:{atk:4,spd:1.5,con:3,int:0.5,def:2,cha:1},
     abilities:['tumpUp','counterThrow','subdue','deathLust'],
     stances: [{ id:'dirtyBoxing', statBoosts:{con:2}, passive:'stunOnHit' }, { id:'pitVeteran', statBoosts:{def:2}, passive:'regenTick' }]},
   { id:'lich', label:'Mage', statWeights:{atk:0.5,spd:1.5,con:1.5,int:5,def:2.5,cha:3},
@@ -172,7 +172,7 @@ function executeHit(attacker, defender, ability) {
   if (ability.grantWhittle) { attacker.whittleBoost += 4; attacker.stats.atk += 4; ability.currentUses--; restore(); return; }
   if (ability.swerve) { ability.currentUses--; restore(); return; }
   if (ability.heal && ability.healingPrayer) { attacker.healingPrayerPending = true; ability.currentUses--; restore(); return; }
-  if (ability.grantDeathLust) { attacker.deathLustTurns = 3; ability.currentUses--; restore(); return; }
+  if (ability.grantDeathLust) { attacker.deathLustTurns = 2; ability.currentUses--; restore(); return; }
 
   ability.currentUses--;
   const hits = ability.doubleHit ? 2 : 1;
@@ -204,17 +204,17 @@ function executeHit(attacker, defender, ability) {
     if (ability.switchLock) defender.switchLocked = true;
 
     if (attacker.stance?.passive === 'stunOnHit' && !defender.status && defender.currentHp > 0) {
-      if (Math.random() < 0.2 + attacker.stats.cha / 200) { defender.status = 'stun'; defender.statusTurns = 1; }
+      if (Math.random() < 0.2 + Math.max(0, (attacker.stats.cha - defender.stats.cha)) / 200) { defender.status = 'stun'; defender.statusTurns = 1; }
     }
     if (!defender.status && defender.currentHp > 0) {
       let fc = ability.freezeChance || 0;
       if (attacker.stance?.passive === 'freezeAll') fc += 0.1;
-      fc += attacker.stats.cha / 200;
+      fc += Math.max(0, (attacker.stats.cha - defender.stats.cha)) / 200;
       if (fc > 0 && Math.random() < fc) { defender.status = 'frozen'; defender.statusTurns = 99; }
     }
-    if (ability.blindChance && defender.currentHp > 0) { if (Math.random() < ability.blindChance + attacker.stats.cha / 200) defender.blindStacks++; }
-    if (attacker.stance?.passive === 'blindPerTurn' && defender.currentHp > 0) { if (Math.random() < 0.15 + attacker.stats.cha / 200) defender.blindStacks++; }
-    if (ability.burnChance && defender.currentHp > 0) { if (Math.random() < ability.burnChance + attacker.stats.cha / 200) defender.burnStacks++; }
+    if (ability.blindChance && defender.currentHp > 0) { if (Math.random() < ability.blindChance + Math.max(0, (attacker.stats.cha - defender.stats.cha)) / 200) defender.blindStacks++; }
+    if (attacker.stance?.passive === 'blindPerTurn' && defender.currentHp > 0) { if (Math.random() < 0.15 + Math.max(0, (attacker.stats.cha - defender.stats.cha)) / 200) defender.blindStacks++; }
+    if (ability.burnChance && defender.currentHp > 0) { if (Math.random() < ability.burnChance + Math.max(0, (attacker.stats.cha - defender.stats.cha)) / 200) defender.burnStacks++; }
     if (ability.boomerang && defender.currentHp > 0) {
       const bm = attacker.stance?.passive === 'boomerangBonus' ? 1.3 : 1.0;
       defender.boomerangHits.push({ damage: Math.round(dmg * 1.0 * bm) });

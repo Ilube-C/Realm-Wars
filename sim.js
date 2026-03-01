@@ -26,7 +26,7 @@ const ABILITIES = {
   lichBlast:    { name:'Lich Blast',      dmgType:'magical',  stat:'int', fixed:8,  dice:[2,6],  uses:14, freezeChance:0.2 },
   glaciate:     { name:'Glaciate',        dmgType:'magical',  stat:'int', fixed:5,  dice:[1,4],  uses:16, freezeChance:0.6 },
   lichLifeDrain:{ name:'Life Drain',      dmgType:'soul',     stat:'int', fixed:7,  dice:[1,8],  uses:10, drain:0.5 },
-  shatter:      { name:'Shatter',         dmgType:'physical', stat:'atk', fixed:16, dice:[2,8],  uses:6,  requiresFrozen:true },
+  shatter:      { name:'Shatter',         dmgType:'physical', stat:'atk', fixed:22, dice:[2,8],  uses:6,  requiresFrozen:true },
   tumpUp:       { name:'Tump Up',         dmgType:'physical', stat:'atk', fixed:5,  dice:[1,6],  uses:16, doubleHit:true },
   counterThrow: { name:'Counter Throw',   dmgType:'physical', stat:'atk', fixed:7,  dice:[1,6],  uses:10, counterMove:true, counterBonus:0.75 },
   subdue:       { name:'Subdue',          dmgType:'physical', stat:'atk', fixed:12, dice:[1,6],  uses:12, switchLock:true },
@@ -50,7 +50,7 @@ const CLASSES = [
       { id:'flashyArrival', statBoosts:{def:2}, passive:'flashyBlind' },
     ]},
   { id:'pitDweller', label:'Berserker',
-    statWeights:{atk:5,spd:1.5,con:3,int:0.5,def:2,cha:1},
+    statWeights:{atk:4,spd:1.5,con:3,int:0.5,def:2,cha:1},
     abilities:['tumpUp','counterThrow','subdue','deathLust'],
     stances: [
       { id:'dirtyBoxing', statBoosts:{con:2}, passive:'stunOnHit' },
@@ -236,7 +236,7 @@ function simulateBattle(cls1, cls2) {
 
       // Death Lust
       if (ability.grantDeathLust) {
-        attacker.deathLustTurns = 3;
+        attacker.deathLustTurns = 2;
         ability.currentUses--;
         restoreStats();
         return;
@@ -288,7 +288,7 @@ function simulateBattle(cls1, cls2) {
 
         // Dirty Boxing stun
         if (attacker.stance?.passive === 'stunOnHit' && !defender.status && defender.currentHp > 0) {
-          if (Math.random() < 0.2 + attacker.stats.cha / 200) {
+          if (Math.random() < 0.2 + Math.max(0, (attacker.stats.cha - defender.stats.cha)) / 200) {
             defender.status = 'stun'; defender.statusTurns = 1;
           }
         }
@@ -297,7 +297,7 @@ function simulateBattle(cls1, cls2) {
         if (!defender.status && defender.currentHp > 0) {
           let freezeChance = ability.freezeChance || 0;
           if (attacker.stance?.passive === 'freezeAll') freezeChance += 0.1;
-          freezeChance += attacker.stats.cha / 200;
+          freezeChance += Math.max(0, (attacker.stats.cha - defender.stats.cha)) / 200;
           if (freezeChance > 0 && Math.random() < freezeChance) {
             defender.status = 'frozen'; defender.statusTurns = 99;
           }
@@ -305,15 +305,15 @@ function simulateBattle(cls1, cls2) {
 
         // Blind chance
         if (ability.blindChance && defender.currentHp > 0) {
-          if (Math.random() < ability.blindChance + attacker.stats.cha / 200) defender.blindStacks++;
+          if (Math.random() < ability.blindChance + Math.max(0, (attacker.stats.cha - defender.stats.cha)) / 200) defender.blindStacks++;
         }
         if (attacker.stance?.passive === 'blindPerTurn' && defender.currentHp > 0) {
-          if (Math.random() < 0.15 + attacker.stats.cha / 200) defender.blindStacks++;
+          if (Math.random() < 0.15 + Math.max(0, (attacker.stats.cha - defender.stats.cha)) / 200) defender.blindStacks++;
         }
 
         // Burn chance
         if (ability.burnChance && defender.currentHp > 0) {
-          if (Math.random() < ability.burnChance + attacker.stats.cha / 200) defender.burnStacks++;
+          if (Math.random() < ability.burnChance + Math.max(0, (attacker.stats.cha - defender.stats.cha)) / 200) defender.burnStacks++;
         }
 
         // Boomerang
