@@ -194,7 +194,6 @@ function executeHit(attacker, defender, ability) {
     if (ability.counterBonus && attacker.damagedThisTurn) dmg = Math.round(dmg * (1 + ability.counterBonus));
     if (attacker.deathLustTurns > 0 && !ability.heal && !ability.grantDeathLust) dmg += 5;
     if (ability.currentHpPct && defender.currentHp > 0) dmg += Math.floor(defender.currentHp * ability.currentHpPct);
-    if (defender.status === 'frozen') dmg = Math.round(dmg * 0.8);
 
     defender.currentHp -= dmg;
     defender.damagedThisTurn = true;

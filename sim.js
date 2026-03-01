@@ -269,7 +269,6 @@ function simulateBattle(cls1, cls2) {
         if (ability.currentHpPct && defender.currentHp > 0) dmg += Math.floor(defender.currentHp * ability.currentHpPct);
 
         // Frozen damage reduction
-        if (defender.status === 'frozen') dmg = Math.round(dmg * 0.8);
 
         defender.currentHp -= dmg;
         defender.damagedThisTurn = true;

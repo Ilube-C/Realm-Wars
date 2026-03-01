@@ -1408,11 +1408,10 @@ async function executeAbility(attacker, defender, ability) {
       log(`  Shatter! +${hpBonus} bonus damage (${Math.round(hitAbility.currentHpPct*100)}% of current HP)!`, 'damage');
     }
 
-    // Frozen target takes reduced damage but thaws
+    // Frozen target thaws on taking damage (no damage reduction)
     if (defender.status === 'frozen' && !hitAbility.requiresFrozen) {
-      dmg = Math.max(1, Math.floor(dmg * 0.8));
       defender.status = null; defender.statusTurns = 0;
-      log(`  ${defName} thaws from the impact! (damage slightly reduced)`, 'status');
+      log(`  ${defName} thaws from the impact!`, 'status');
       updateHpBar(!isPlayer ? 'player' : 'opponent');
     }
 
