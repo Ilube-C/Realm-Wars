@@ -64,7 +64,7 @@ const CLASSES = [
       { id:'soulSnatcher', statBoosts:{int:3}, passive:'killHeal' },
     ]},
   { id:'rexRang', label:'Ranger',
-    statWeights:{atk:4,spd:4,con:1.5,int:0.5,def:2,cha:2},
+    statWeights:{atk:4,spd:3.5,con:3,int:0.5,def:2,cha:1},
     abilities:['battlerang','emberang','whittle','swerve'],
     stances: [
       { id:'patientKiller', statBoosts:{atk:2}, passive:'boomerangBonus' },
