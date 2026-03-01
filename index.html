@@ -424,7 +424,7 @@ const ABILITIES = {
   lichBlast:    { name:'Lich Blast',      dmgType:'magical',  stat:'int', fixed:8,  dice:[2,6],  acc:0,  uses:14, desc:'Concentrated necrotic-arcane blast. High damage with a chance to freeze.', freezeChance:0.2 },
   glaciate:     { name:'Glaciate',        dmgType:'magical',  stat:'int', fixed:5,  dice:[1,4],  acc:1,  uses:16, desc:'Wave of absolute cold. Low damage but very high freeze chance.', freezeChance:0.6 },
   lichLifeDrain:{ name:'Life Drain',      dmgType:'magical',  stat:'int', fixed:7,  dice:[1,8],  acc:0,  uses:10, desc:'Siphon life force from the target. Heals proportion of damage dealt.', drain:0.5 },
-  shatter:      { name:'Shatter',         dmgType:'physical', stat:'atk', fixed:22, dice:[2,8],  acc:1,  uses:6,  desc:'Shatter a frozen target into pieces. Physical — strong vs low DEF, weak vs tanks. ONLY works on frozen enemies.', requiresFrozen:true },
+  shatter:      { name:'Shatter',         dmgType:'physical', stat:'int', fixed:22, dice:[2,8],  acc:1,  uses:6,  desc:'Channels magic through ice — scales with INT, resisted by DEF. ONLY works on frozen enemies.', requiresFrozen:true },
   // PIT DWELLER ABILITIES
   tumpUp:       { name:'Tump Up',        dmgType:'physical', stat:'atk', fixed:5,  dice:[1,6],  acc:1,  uses:16, desc:'Hits twice. Second hit deals more damage but can miss.', doubleHit:true },
   counterThrow: { name:'Counter Throw',  dmgType:'physical', stat:'atk', fixed:7,  dice:[1,6],  acc:0,  uses:10, desc:'Act with reduced speed. Deals 75% bonus damage if opponent already hit you this turn.', counterMove:true },
@@ -702,11 +702,11 @@ function rollDamageForAbility(attacker, defender, ability) {
     return { damage: Math.max(1, baseDmg), baseDmg, atkRoll: 0, defRoll: 0, multiplier: 1.0 };
   }
   let atkStat, defStat;
+  // Attack stat comes from ability.stat, defense stat from dmgType
+  atkStat = attacker.stats[ability.stat] || attacker.stats.atk;
   if (ability.dmgType === 'physical') {
-    atkStat = attacker.stats.atk;
     defStat = defender.stats.def;
   } else {
-    atkStat = attacker.stats.int;
     defStat = defender.stats.int;
   }
   const atkRoll = rollDice(2, 6) + atkStat;

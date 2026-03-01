@@ -26,7 +26,7 @@ const ABILITIES = {
   lichBlast:    { name:'Lich Blast',      dmgType:'magical',  stat:'int', fixed:8,  dice:[2,6],  uses:14, freezeChance:0.2 },
   glaciate:     { name:'Glaciate',        dmgType:'magical',  stat:'int', fixed:5,  dice:[1,4],  uses:16, freezeChance:0.6 },
   lichLifeDrain:{ name:'Life Drain',      dmgType:'soul',     stat:'int', fixed:7,  dice:[1,8],  uses:10, drain:0.5 },
-  shatter:      { name:'Shatter',         dmgType:'physical', stat:'atk', fixed:22, dice:[2,8],  uses:6,  requiresFrozen:true },
+  shatter:      { name:'Shatter',         dmgType:'physical', stat:'int', fixed:22, dice:[2,8],  uses:6,  requiresFrozen:true },
   tumpUp:       { name:'Tump Up',         dmgType:'physical', stat:'atk', fixed:5,  dice:[1,6],  uses:16, doubleHit:true },
   counterThrow: { name:'Counter Throw',   dmgType:'physical', stat:'atk', fixed:7,  dice:[1,6],  uses:10, counterMove:true, counterBonus:0.75 },
   subdue:       { name:'Subdue',          dmgType:'physical', stat:'atk', fixed:12, dice:[1,6],  uses:12, switchLock:true },
@@ -113,8 +113,9 @@ function calcDamage(ability, attacker, defender) {
     return Math.max(1, Math.round(raw/2 * physMult + raw/2 * magMult));
   }
   let atkStat, defStat;
-  if (ability.dmgType === 'physical') { atkStat = attacker.stats.atk; defStat = defender.stats.def; }
-  else { atkStat = attacker.stats.int; defStat = defender.stats.int; }
+  atkStat = attacker.stats[ability.stat] || attacker.stats.atk;
+  if (ability.dmgType === 'physical') { defStat = defender.stats.def; }
+  else { defStat = defender.stats.int; }
   const mult = 0.5 + 0.5 * (rollDice(2,6) + atkStat) / (rollDice(2,6) + defStat);
   return Math.max(1, Math.round(raw * mult));
 }
