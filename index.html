@@ -422,12 +422,12 @@ const ABILITIES = {
   lichBlast:    { name:'Lich Blast',      dmgType:'magical',  stat:'int', fixed:8,  dice:[2,6],  acc:0,  uses:14, desc:'Concentrated necrotic-arcane blast. High damage with a chance to freeze.', freezeChance:0.2 },
   glaciate:     { name:'Glaciate',        dmgType:'magical',  stat:'int', fixed:5,  dice:[1,4],  acc:1,  uses:16, desc:'Wave of absolute cold. Low damage but very high freeze chance.', freezeChance:0.6 },
   lichLifeDrain:{ name:'Life Drain',      dmgType:'magical',  stat:'int', fixed:7,  dice:[1,8],  acc:0,  uses:10, desc:'Siphon life force from the target. Heals proportion of damage dealt.', drain:0.5 },
-  shatter:      { name:'Shatter',         dmgType:'physical', stat:'int', fixed:16, dice:[2,8],  acc:1,  uses:6,  desc:'Shatter a frozen target into pieces. ONLY works on frozen enemies.', requiresFrozen:true },
+  shatter:      { name:'Shatter',         dmgType:'magical',  stat:'int', fixed:16, dice:[2,8],  acc:1,  uses:6,  desc:'Shatter a frozen target into pieces. ONLY works on frozen enemies.', requiresFrozen:true },
   // PIT DWELLER ABILITIES
-  tumpUp:       { name:'Tump Up',        dmgType:'physical', stat:'atk', fixed:4,  dice:[1,4],  acc:1,  uses:16, desc:'Hits twice. Second hit deals more damage but can miss.', doubleHit:true },
-  counterThrow: { name:'Counter Throw',  dmgType:'physical', stat:'atk', fixed:8,  dice:[2,6],  acc:0,  uses:10, desc:'Act with reduced speed. Deals bonus damage if opponent already hit you this turn.', counterMove:true },
-  subdue:       { name:'Subdue',         dmgType:'physical', stat:'atk', fixed:7,  dice:[1,6],  acc:1,  uses:12, desc:'Pin the opponent down. Prevents them from switching next turn.', lockSwitch:true },
-  deathLust:    { name:'Death Lust',     dmgType:'physical', stat:'atk', fixed:5,  dice:[1,4],  acc:99, uses:4,  desc:'Enter a frenzy. Grants bonus soul damage on all attacks for 2 turns. Lost on switching.', grantDeathLust:true },
+  tumpUp:       { name:'Tump Up',        dmgType:'physical', stat:'atk', fixed:7,  dice:[1,6],  acc:1,  uses:16, desc:'Hits twice. Second hit deals more damage but can miss.', doubleHit:true },
+  counterThrow: { name:'Counter Throw',  dmgType:'physical', stat:'atk', fixed:10, dice:[2,6],  acc:0,  uses:10, desc:'Act with reduced speed. Deals bonus damage if opponent already hit you this turn.', counterMove:true },
+  subdue:       { name:'Subdue',         dmgType:'physical', stat:'atk', fixed:9,  dice:[1,6],  acc:1,  uses:12, desc:'Pin the opponent down. Prevents them from switching next turn.', lockSwitch:true },
+  deathLust:    { name:'Death Lust',     dmgType:'physical', stat:'atk', fixed:6,  dice:[1,4],  acc:99, uses:4,  desc:'Enter a frenzy. Grants bonus soul damage on all attacks for 2 turns. Lost on switching.', grantDeathLust:true },
 };
 
 // ============================================================
@@ -1264,7 +1264,7 @@ async function executeAbility(attacker, defender, ability) {
       await delay(200);
       // Second hit: +50% fixed damage but needs an attack roll
       const secondHitAbility = {...ability, fixed: Math.floor((ability.fixed || 0) * 1.5), doubleHit: false};
-      const roll = attackRoll(attacker, {acc: -1, stat: ability.stat}, 10 + defender.stats.def);
+      const roll = attackRoll(attacker, {acc: -1, stat: ability.stat}, defender.stats.def);
       if (roll.hit) {
         log(`  Second hit connects! (rolled ${roll.nat})`, 'roll');
         await dealHit(secondHitAbility, 'Second hit');
