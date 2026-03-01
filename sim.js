@@ -288,7 +288,7 @@ function simulateBattle(cls1, cls2) {
 
         // Dirty Boxing stun
         if (attacker.stance?.passive === 'stunOnHit' && !defender.status && defender.currentHp > 0) {
-          if (Math.random() < 0.2 + Math.max(0, (attacker.stats.cha - defender.stats.cha)) / 200) {
+          if (Math.random() < 0.2 + Math.max(0, (attacker.stats.cha - defender.stats.cha)) * 0.03) {
             defender.status = 'stun'; defender.statusTurns = 1;
           }
         }
@@ -297,7 +297,7 @@ function simulateBattle(cls1, cls2) {
         if (!defender.status && defender.currentHp > 0) {
           let freezeChance = ability.freezeChance || 0;
           if (attacker.stance?.passive === 'freezeAll') freezeChance += 0.1;
-          freezeChance += Math.max(0, (attacker.stats.cha - defender.stats.cha)) / 200;
+          freezeChance += Math.max(0, (attacker.stats.cha - defender.stats.cha)) * 0.03;
           if (freezeChance > 0 && Math.random() < freezeChance) {
             defender.status = 'frozen'; defender.statusTurns = 99;
           }
@@ -305,15 +305,15 @@ function simulateBattle(cls1, cls2) {
 
         // Blind chance
         if (ability.blindChance && defender.currentHp > 0) {
-          if (Math.random() < ability.blindChance + Math.max(0, (attacker.stats.cha - defender.stats.cha)) / 200) defender.blindStacks++;
+          if (Math.random() < ability.blindChance + Math.max(0, (attacker.stats.cha - defender.stats.cha)) * 0.03) defender.blindStacks++;
         }
         if (attacker.stance?.passive === 'blindPerTurn' && defender.currentHp > 0) {
-          if (Math.random() < 0.15 + Math.max(0, (attacker.stats.cha - defender.stats.cha)) / 200) defender.blindStacks++;
+          if (Math.random() < 0.15 + Math.max(0, (attacker.stats.cha - defender.stats.cha)) * 0.03) defender.blindStacks++;
         }
 
         // Burn chance
         if (ability.burnChance && defender.currentHp > 0) {
-          if (Math.random() < ability.burnChance + Math.max(0, (attacker.stats.cha - defender.stats.cha)) / 200) defender.burnStacks++;
+          if (Math.random() < ability.burnChance + Math.max(0, (attacker.stats.cha - defender.stats.cha)) * 0.03) defender.burnStacks++;
         }
 
         // Boomerang
