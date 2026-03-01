@@ -939,14 +939,21 @@ async function startBattle() {
   document.getElementById('battle-num').textContent = battleNum;
 
   const level = Math.min(20, 5 + Math.floor(battleNum / 3));
+  const TESTING_1V1 = true; // Set to false to restore 4v4
   const lichCls = CLASSES.find(c => c.id === 'lich');
   const pitDwellerCls = CLASSES.find(c => c.id === 'pitDweller');
-  let available = shuffle(CLASSES.filter(c => c.id !== 'lich' && c.id !== 'pitDweller'));
-  // Guarantee Lich and Pit Dweller on player team
-  const playerClasses = [lichCls, pitDwellerCls, ...available.splice(0, 2)];
-  const oppClasses = available.splice(0, 4);
-  playerTeam = shuffle(playerClasses).map(c => createCombatant(c, level));
-  oppTeam = oppClasses.map(c => createCombatant(c, level));
+  if (TESTING_1V1) {
+    // 1v1 test mode: Lich vs Pit Dweller
+    playerTeam = [createCombatant(lichCls, level)];
+    oppTeam = [createCombatant(pitDwellerCls, level)];
+  } else {
+    // Full 4v4 mode
+    let available = shuffle(CLASSES.filter(c => c.id !== 'lich' && c.id !== 'pitDweller'));
+    const playerClasses = [lichCls, pitDwellerCls, ...available.splice(0, 2)];
+    const oppClasses = available.splice(0, 4);
+    playerTeam = shuffle(playerClasses).map(c => createCombatant(c, level));
+    oppTeam = oppClasses.map(c => createCombatant(c, level));
+  }
   playerActive = 0; oppActive = 0;
 
   // Apply stances for AI team members with stances
