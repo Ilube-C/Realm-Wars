@@ -288,7 +288,7 @@ body {
 </head>
 <body>
 <div id="game">
-  <div id="score-bar">Victories: <span id="p-wins">0</span> | Defeats: <span id="p-losses">0</span> | Encounter #<span id="battle-num">1</span></div>
+  <div id="score-bar">Victories: <span id="p-wins">0</span> | Defeats: <span id="p-losses">0</span> | Encounter #<span id="battle-num">1</span> <span id="terrain-display"></span></div>
   <div id="battle-scene">
     <div class="team-roster player-roster" id="player-roster"></div>
     <div id="arena">
@@ -440,6 +440,11 @@ const ABILITIES = {
   emberang:     { name:'Emberang',       dmgType:'physical', stat:'atk', fixed:5,  dice:[1,6],  acc:0,  uses:12, desc:'Less damage than Battlerang but chance to burn. Hits again at end of next turn.', boomerang:true, burnChance:0.35 },
   whittle:      { name:'Whittle',        dmgType:'physical', stat:'atk', fixed:4,  dice:[1,4],  acc:99, uses:4,  desc:'Sharpen your edge. Grants +4 ATK until you switch out.', grantWhittle:true },
   swerve:       { name:'Swerve',         dmgType:'physical', stat:'atk', fixed:0,  dice:[1,1],  acc:99, uses:10, desc:'Act fast and dodge. High chance to evade enemy attacks this turn. Much less effective if used consecutively.', swerve:true },
+  // COUNT COCTION ABILITIES
+  poisonDart:   { name:'Poison Dart',    dmgType:'physical', stat:'atk', fixed:6,  dice:[1,6],  acc:0,  uses:14, desc:'Quick physical strike. Medium chance to add a stack of poison.', poisonChance:0.40 },
+  goblinGas:    { name:'Goblin Gas',     dmgType:'physical', stat:'atk', fixed:0,  dice:[1,1],  acc:99, uses:4,  desc:'Deploy a poison gas cloud. Both fighters gain a poison stack each turn for 5 turns. Replaces existing terrain.', goblinGas:true },
+  remedialOintment:{ name:'Remedial Ointment', dmgType:'heal', stat:'cha', fixed:0, dice:[1,1], acc:99, uses:6, desc:'Remove all poison from yourself and heal 5 HP per stack removed.', remedialOintment:true, heal:true },
+  violentExtraction:{ name:'Violent Extraction', dmgType:'soul', stat:'atk', fixed:0, dice:[1,1], acc:99, uses:6, desc:'Rip all poison from the enemy. Deals 6 soul damage per stack removed.', violentExtraction:true },
 };
 
 // ============================================================
@@ -460,6 +465,7 @@ const NAMES = {
   monk:['Kai','Yuki','Zen','Lotus','Jin','Sora','Ryu','Bodhi'],
   lich:['Malachar','Xyranthos','Vek\'thar','Osseus','Dreadhollow','Lichtar','Nekros','Morvaine'],
   ranger:['Rex','Ranger','Scout','Hawk','Flint','Arrow','Tracker','Swift'],
+  rogue:['Count','Shadow','Vex','Nyx','Shade','Whisper','Dusk','Gobbo'],
 };
 
 const CLASSES = [
@@ -503,7 +509,7 @@ const CLASSES = [
     statWeights:{atk:3,spd:1,con:3,int:1.5,def:4,cha:3.5},
     abilities:['radialStrike','makeWay','heavenlyBlow','healingPrayer'], sprite:'knight',
     stances: [
-      { id:'battlefieldStar', name:'Battlefield Star', desc:'CHA+2. Small chance to apply blind stack to opponent at start of every turn.',
+      { id:'battlefieldStar', name:'Battlefield Star', desc:'CHA+2. Chance to apply blind stack to opponent each turn.',
         statBoosts:{cha:2}, passive:'blindPerTurn' },
       { id:'flashyArrival', name:'Flashy Arrival', desc:'DEF+2. Applies 2 stacks of blind to opponent upon selection.',
         statBoosts:{def:2}, passive:'flashyBlind' },
@@ -534,6 +540,15 @@ const CLASSES = [
         statBoosts:{atk:2}, passive:'boomerangBonus' },
       { id:'guerillaFighter', name:'Guerilla Fighter', desc:'SPD+2. On switch-in, throws a 30% power Battlerang. After dodging with Swerve, switch out.',
         statBoosts:{spd:2}, passive:'guerillaSwitchOut', guerillaEntry:true },
+    ]},
+  { id:'countCoction', label:'Rogue', fixedName:'Count Coction', color:'#5a8a3a',
+    statWeights:{atk:4,spd:5,con:1.5,int:0.5,def:1,cha:2},
+    abilities:['poisonDart','goblinGas','remedialOintment','violentExtraction'], sprite:'rogue',
+    stances: [
+      { id:'rapidTransmission', name:'Rapid Transmission', desc:'CHA+2. When an enemy gains a poison stack, 30% chance (+CHA) they gain an extra one.',
+        statBoosts:{cha:2}, passive:'rapidTransmission' },
+      { id:'neurotoxin', name:'Neurotoxin', desc:'SPD+2. Poisoned enemies lose 1 INT per poison stack.',
+        statBoosts:{spd:2}, passive:'neurotoxin' },
     ]},
 ];
 
@@ -675,7 +690,7 @@ function createCombatant(cls, level) {
     stance: null, stances: cls.stances || null,
     switchLocked: false, deathLustTurns: 0, damagedThisTurn: false,
     blindStacks: 0, healingPrayerPending: false, makeWaySwitch: false, defBonusThisTurn: 0,
-    boomerangHits: [], burnStacks: 0, swerveActive: false, swerveLastTurn: false, whittleBoost: 0, flinched: false,
+    boomerangHits: [], burnStacks: 0, swerveActive: false, swerveLastTurn: false, whittleBoost: 0, flinched: false, poisonStacks: 0,
   };
 }
 
@@ -709,6 +724,23 @@ function rollDamageForAbility(attacker, defender, ability) {
   } else {
     defStat = defender.stats.int;
   }
+  // Neurotoxin: poisoned fighters lose 1 effective INT per stack
+  if (defender.poisonStacks > 0 && ability.dmgType === 'magical') {
+    // Check if any active opponent has neurotoxin stance
+    const defIsPlayer = playerTeam.includes(defender);
+    const opp = defIsPlayer ? opponent() : player();
+    if (opp.stance?.passive === 'neurotoxin') {
+      defStat = Math.max(1, defStat - defender.poisonStacks);
+    }
+  }
+  // Also reduce attacker's INT if they're poisoned and enemy has neurotoxin
+  if (attacker.poisonStacks > 0 && (ability.stat === 'int')) {
+    const atkIsPlayer = playerTeam.includes(attacker);
+    const opp = atkIsPlayer ? opponent() : player();
+    if (opp.stance?.passive === 'neurotoxin') {
+      atkStat = Math.max(1, atkStat - attacker.poisonStacks);
+    }
+  }
   const atkRoll = rollDice(2, 6) + atkStat;
   const defRoll = rollDice(2, 6) + defStat;
   const multiplier = 0.5 + 0.5 * (atkRoll / defRoll);
@@ -723,6 +755,7 @@ function getInitiative(c) { const base = rollDice(2, 8) + c.stats.spd; if (c.sta
 // ============================================================
 let playerTeam = [], oppTeam = [];
 let playerActive = 0, oppActive = 0;
+let terrain = null; // { name, turnsLeft, effect } — only one active at a time
 let battleNum = 0, wins = 0, losses = 0;
 let isAnimating = false, autoMode = false, autoTimer = null;
 
@@ -758,6 +791,7 @@ function renderStatusEffects(b) {
   if (b.switchLocked) html += `<span class="status-effect-tag" style="background:#3a2a1a;color:#c86">📌 PINNED</span>`;
   if (b.healingPrayerPending) html += `<span class="status-effect-tag" style="background:#2a4a2a;color:#8c8">🙏 PRAYER PENDING</span>`;
   if (b.burnStacks > 0) html += `<span class="status-effect-tag" style="background:#4a2a0a;color:#f84">🔥 BURN ×${b.burnStacks}</span>`;
+  if (b.poisonStacks > 0) html += `<span class="status-effect-tag" style="background:#2a4a1a;color:#6a4">☠ POISON ×${b.poisonStacks} (${b.poisonStacks * 2}/turn)</span>`;
   if (b.boomerangHits.length > 0) html += `<span class="status-effect-tag" style="background:#3a3a1a;color:#cc8">🪃 RANG INCOMING (${b.boomerangHits.length})</span>`;
   if (b.flinched) html += `<span class="status-effect-tag" style="background:#4a3a1a;color:#ea8">😵 FLINCHED</span>`;
   if (b.swerveActive) html += `<span class="status-effect-tag" style="background:#1a3a2a;color:#8c8">💨 SWERVING</span>`;
@@ -1053,21 +1087,21 @@ async function startBattle() {
   const pitDwellerCls = CLASSES.find(c => c.id === 'pitDweller');
   const sirShiningCls = CLASSES.find(c => c.id === 'sirShining');
   const rexRangCls = CLASSES.find(c => c.id === 'rexRang');
+  const countCoctionCls = CLASSES.find(c => c.id === 'countCoction');
   if (TESTING_1V1) {
     // 1v1 test mode: random matchup from custom characters
-    const customs = [lichCls, pitDwellerCls, sirShiningCls, rexRangCls];
+    const customs = [lichCls, pitDwellerCls, sirShiningCls, rexRangCls, countCoctionCls];
     const shuffled = shuffle(customs);
     playerTeam = [createCombatant(shuffled[0], level)];
     oppTeam = [createCombatant(shuffled[1], level)];
   } else {
-    // Full 4v4 mode
-    let available = shuffle(CLASSES.filter(c => c.id !== 'lich' && c.id !== 'pitDweller'));
-    const playerClasses = [lichCls, pitDwellerCls, ...available.splice(0, 2)];
-    const oppClasses = available.splice(0, 4);
-    playerTeam = shuffle(playerClasses).map(c => createCombatant(c, level));
-    oppTeam = oppClasses.map(c => createCombatant(c, level));
+    // 2v2 mode: pick from custom characters
+    const customs = shuffle([lichCls, pitDwellerCls, sirShiningCls, rexRangCls, countCoctionCls]);
+    playerTeam = customs.slice(0, 2).map(c => createCombatant(c, level));
+    oppTeam = customs.slice(2, 4).map(c => createCombatant(c, level));
   }
   playerActive = 0; oppActive = 0;
+  terrain = null; // Reset terrain each battle
 
   // Apply stances for AI team members with stances
   oppTeam.forEach(b => { if (b.stances) { applyStance(b, aiPickStance(b)); } });
@@ -1217,6 +1251,35 @@ async function executeTurn(moveIdx) {
 
     // (Healing Prayer is now instant — no pending heal logic needed)
 
+    // Terrain tick: Goblin Gas applies poison to both active fighters
+    if (terrain && terrain.turnsLeft > 0) {
+      terrain.turnsLeft--;
+      if (terrain.effect === 'poisonBoth') {
+        for (const fighter of [player(), opponent()]) {
+          if (!fighter.fainted && fighter.currentHp > 0) {
+            const isFighterPlayer = playerTeam.includes(fighter);
+            const enemy = isFighterPlayer ? opponent() : player();
+            let stacks = 1;
+            // Rapid Transmission: check if the ENEMY has this passive (since they're the poisoner)
+            if (enemy.stance?.passive === 'rapidTransmission') {
+              const rtChance = 0.30 + (Math.max(0, (enemy.stats.cha - fighter.stats.cha)) * 0.02);
+              if (Math.random() < rtChance) { stacks = 2; log(`  Rapid Transmission! Double poison on ${fighter.name}!`, 'status'); }
+            }
+            fighter.poisonStacks += stacks;
+            log(`Goblin Gas poisons ${fighter.name}! (${fighter.poisonStacks} stack${fighter.poisonStacks>1?'s':''})`, 'status');
+            updateHpBar(isFighterPlayer ? 'player' : 'opponent');
+          }
+        }
+      }
+      if (terrain.turnsLeft <= 0) {
+        log(`The ${terrain.name} dissipates.`, 'info');
+        terrain = null;
+        document.getElementById('terrain-display').innerHTML = '';
+      } else {
+        document.getElementById('terrain-display').innerHTML = `| ☁️ ${terrain.name} (${terrain.turnsLeft}t)`;
+      }
+    }
+
     // Make Way: auto-switch at end of turn (only in 4v4)
     if (!p.fainted && playerAb.makeWay && playerTeam.length > 1) {
       const alive = playerTeam.filter((t,i) => i !== playerActive && !t.fainted);
@@ -1319,7 +1382,7 @@ async function executeAbility(attacker, defender, ability) {
     if (ability.healingPrayer) {
       const healAmt = Math.max(5, Math.floor(attacker.maxHp * 0.25));
       attacker.currentHp = Math.min(attacker.maxHp, attacker.currentHp + healAmt);
-      attacker.status = null; attacker.statusTurns = 0; attacker.blindStacks = 0; attacker.burnStacks = 0;
+      attacker.status = null; attacker.statusTurns = 0; attacker.blindStacks = 0; attacker.burnStacks = 0; attacker.poisonStacks = 0;
       updateHpBar(isPlayer ? 'player' : 'opponent');
       showDmgFloat(isPlayer ? 'player' : 'opponent', healAmt, false, true);
       log(`${atkName} uses Healing Prayer! Healed ${healAmt} HP and cured all statuses!`, 'heal');
@@ -1355,6 +1418,55 @@ async function executeAbility(attacker, defender, ability) {
   if (ability.swerve) {
     log(`${atkName} swerves${attacker.swerveActive === 'high' ? '! 100% evasion this turn' : ' again — only 20% evasion'}.`, 'status');
     updateHpBar(isPlayer ? 'player' : 'opponent');
+    return;
+  }
+
+  // Goblin Gas: set terrain effect
+  if (ability.goblinGas) {
+    terrain = { name: 'Goblin Gas', turnsLeft: 5, effect: 'poisonBoth' };
+    log(`${atkName} deploys Goblin Gas! Both fighters will gain poison each turn for 5 turns!`, 'status');
+    document.getElementById('terrain-display').innerHTML = '| ☁️ Goblin Gas (5t)';
+    updateHpBar('player'); updateHpBar('opponent');
+    return;
+  }
+
+  // Remedial Ointment: remove self poison and heal
+  if (ability.remedialOintment) {
+    const stacks = attacker.poisonStacks;
+    if (stacks > 0) {
+      const healAmt = stacks * 5;
+      attacker.poisonStacks = 0;
+      // Remove neurotoxin INT debuff
+      if (defender.stance?.passive === 'neurotoxin') {
+        // INT was already reduced — it'll be recalculated naturally since stacks are 0
+      }
+      attacker.currentHp = Math.min(attacker.maxHp, attacker.currentHp + healAmt);
+      updateHpBar(isPlayer ? 'player' : 'opponent');
+      showDmgFloat(isPlayer ? 'player' : 'opponent', healAmt, false, true);
+      log(`${atkName} applies Remedial Ointment! Removed ${stacks} poison stacks and healed ${healAmt} HP!`, 'heal');
+    } else {
+      log(`${atkName} applies Remedial Ointment, but has no poison to remove!`, 'info');
+    }
+    renderRoster(isPlayer ? 'player' : 'opponent');
+    return;
+  }
+
+  // Violent Extraction: remove enemy poison and deal soul damage per stack
+  if (ability.violentExtraction) {
+    const stacks = defender.poisonStacks;
+    if (stacks > 0) {
+      const dmg = stacks * 6;
+      defender.poisonStacks = 0;
+      defender.currentHp = Math.max(0, defender.currentHp - dmg);
+      defender.damagedThisTurn = true;
+      updateHpBar(!isPlayer ? 'player' : 'opponent');
+      showDmgFloat(!isPlayer ? 'player' : 'opponent', dmg, stacks >= 4, false);
+      log(`${atkName} violently extracts ${stacks} poison stacks from ${defName} for ${dmg} soul damage!`, 'damage');
+      renderRoster(!isPlayer ? 'player' : 'opponent');
+      if (defender.currentHp <= 0 && !defender.fainted) { defender.fainted = true; animateFaint(defender); }
+    } else {
+      log(`${atkName} tries Violent Extraction, but ${defName} has no poison!`, 'miss');
+    }
     return;
   }
 
@@ -1488,7 +1600,7 @@ async function executeAbility(attacker, defender, ability) {
 
     // Dirty Boxing stance: chance to stun on dealing damage
     if (attacker.stance && attacker.stance.passive === 'stunOnHit' && !defender.status && !defender.fainted && defender.currentHp > 0) {
-      const stunChance = 0.2 + (Math.max(0, (attacker.stats.cha - defender.stats.cha)) * 0.02);
+      const stunChance = 0.3 + (Math.max(0, (attacker.stats.cha - defender.stats.cha)) * 0.02);
       if (Math.random() < stunChance) {
         defender.status = 'stun'; defender.statusTurns = 1;
         log(`  Dirty Boxing! ${defName} is stunned!`, 'status');
@@ -1532,7 +1644,7 @@ async function executeAbility(attacker, defender, ability) {
 
     // Battlefield Star: small chance to blind each hit
     if (attacker.stance && attacker.stance.passive === 'blindPerTurn' && !defender.fainted && defender.currentHp > 0) {
-      const bsBlindChance = 0.15 + (Math.max(0, (attacker.stats.cha - defender.stats.cha)) * 0.02);
+      const bsBlindChance = 0.25 + (Math.max(0, (attacker.stats.cha - defender.stats.cha)) * 0.02);
       if (Math.random() < bsBlindChance) {
         defender.blindStacks++;
         log(`  Battlefield Star! ${defName} is dazzled! (${defender.blindStacks} blind stack${defender.blindStacks>1?'s':''})`, 'status');
@@ -1546,6 +1658,22 @@ async function executeAbility(attacker, defender, ability) {
       if (Math.random() < bChance) {
         defender.burnStacks++;
         log(`  ${defName} is burning! (${defender.burnStacks} stack${defender.burnStacks>1?'s':''})`, 'status');
+        updateHpBar(!isPlayer ? 'player' : 'opponent');
+      }
+    }
+
+    // Poison chance (Poison Dart)
+    if (hitAbility.poisonChance && !defender.fainted && defender.currentHp > 0) {
+      const pChance = hitAbility.poisonChance + (Math.max(0, (attacker.stats.cha - defender.stats.cha)) * 0.02);
+      if (Math.random() < pChance) {
+        let stacks = 1;
+        // Rapid Transmission: chance to double poison application
+        if (attacker.stance?.passive === 'rapidTransmission') {
+          const rtChance = 0.30 + (Math.max(0, (attacker.stats.cha - defender.stats.cha)) * 0.02);
+          if (Math.random() < rtChance) { stacks = 2; log(`  Rapid Transmission! Double poison!`, 'status'); }
+        }
+        defender.poisonStacks += stacks;
+        log(`  ${defName} is poisoned! (${defender.poisonStacks} stack${defender.poisonStacks>1?'s':''}, ${defender.poisonStacks * 2} dmg/turn)`, 'status');
         updateHpBar(!isPlayer ? 'player' : 'opponent');
       }
     }
@@ -1651,6 +1779,17 @@ async function tickStatus(battler) {
       if (battler.burnStacks <= 0) log(`${battler.name}'s burn goes out!`, 'status');
       else log(`  A burn stack fades. (${battler.burnStacks} left)`, 'status');
     }
+    renderRoster(isPlayer ? 'player' : 'opponent');
+    if (battler.currentHp <= 0) { battler.fainted = true; animateFaint(battler); }
+  }
+
+  // Poison tick: fixed 2 damage per stack, stacks don't fall off
+  if (battler.poisonStacks > 0 && !battler.fainted) {
+    const poisonDmg = battler.poisonStacks * 2;
+    battler.currentHp = Math.max(0, battler.currentHp - poisonDmg);
+    updateHpBar(isPlayer ? 'player' : 'opponent');
+    showDmgFloat(isPlayer ? 'player' : 'opponent', poisonDmg, false);
+    log(`${battler.name} takes ${poisonDmg} poison damage! (${battler.poisonStacks} stack${battler.poisonStacks>1?'s':''})`, 'status');
     renderRoster(isPlayer ? 'player' : 'opponent');
     if (battler.currentHp <= 0) { battler.fainted = true; animateFaint(battler); }
   }
@@ -1815,19 +1954,27 @@ function pickAIAbility() {
     const healIdx = o.abilities.findIndex(a => a.heal && a.currentUses > 0);
     if (healIdx >= 0) return healIdx;
   }
+  // Remedial Ointment: use when poisoned and below 60% HP
+  if (o.poisonStacks >= 2 && o.currentHp < o.maxHp * 0.6) {
+    const ointIdx = o.abilities.findIndex(a => a.remedialOintment && a.currentUses > 0);
+    if (ointIdx >= 0) return ointIdx;
+  }
   let best = -1, bestScore = -Infinity;
   o.abilities.forEach((ab, i) => {
     if (ab.currentUses <= 0 || ab.heal) return;
     if (ab.requiresFrozen && player().status !== 'frozen') return;
-    if (ab.grantWhittle && o.whittleBoost >= 8) return; // Don't stack too high
+    if (ab.grantWhittle && o.whittleBoost >= 8) return;
     let score;
     if (ab.swerve) { score = (o.swerveLastTurn ? 5 : 20) * (0.8 + Math.random() * 0.4); }
     else if (ab.grantWhittle) { score = (o.whittleBoost === 0 ? 25 : 15) * (0.8 + Math.random() * 0.4); }
+    else if (ab.goblinGas) { score = (!terrain ? 25 : 3) * (0.8 + Math.random() * 0.4); } // Deploy gas if no terrain
+    else if (ab.violentExtraction) { score = (player().poisonStacks >= 3 ? player().poisonStacks * 8 : 2) * (0.8 + Math.random() * 0.4); } // Cash out at 3+ stacks
+    else if (ab.remedialOintment) { return; } // Handled by heal check above
     else {
       const avgDmg = (ab.fixed || 0) + ab.dice[0] * (ab.dice[1] + 1) / 2;
       score = avgDmg * (0.8 + Math.random() * 0.4);
       if (ab.requiresFrozen && player().status === 'frozen') { score += (ab.currentHpPct || 0) * player().currentHp; score *= 2; }
-      if (ab.boomerang) score *= 1.3; // Value delayed damage
+      if (ab.boomerang) score *= 1.3;
     }
     if (score > bestScore) { bestScore = score; best = i; }
   });
@@ -1849,6 +1996,9 @@ function pickSmartMove() {
     let score;
     if (ab.swerve) { score = (p.swerveLastTurn ? 5 : 20) * (0.85 + Math.random() * 0.3); }
     else if (ab.grantWhittle) { score = (p.whittleBoost === 0 ? 25 : 15) * (0.85 + Math.random() * 0.3); }
+    else if (ab.goblinGas) { score = (!terrain ? 25 : 3) * (0.85 + Math.random() * 0.3); }
+    else if (ab.violentExtraction) { score = (opponent().poisonStacks >= 3 ? opponent().poisonStacks * 8 : 2) * (0.85 + Math.random() * 0.3); }
+    else if (ab.remedialOintment) { return; }
     else {
       const avgDmg = (ab.fixed || 0) + ab.dice[0] * (ab.dice[1] + 1) / 2;
       score = avgDmg * (0.85 + Math.random() * 0.3);
