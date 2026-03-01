@@ -95,7 +95,7 @@ body {
   position: absolute; font-weight: 900; font-size: 22px;
   pointer-events: none; z-index: 50;
   text-shadow: 1px 1px 2px #000, -1px -1px 2px #000;
-  animation: floatUp 1s ease-out forwards;
+  animation: floatUp 1.5s ease-out forwards;
 }
 .dmg-float.crit { font-size: 28px; color: #ffcc00 !important; }
 .dmg-float.heal { color: #6aaa5a !important; }
@@ -1332,7 +1332,7 @@ async function doSwitch(newIdx) {
     applyMoonlightHeal(player(), playerTeam, 'player');
 
     // Opponent gets a free attack
-    await delay(400);
+    await delay(1000);
     const oppAbIdx = pickAIAbility();
     const oppAb = opponent().abilities[oppAbIdx]?.currentUses > 0 ? opponent().abilities[oppAbIdx] : STRUGGLE;
     await executeAbility(opponent(), player(), oppAb);
@@ -1376,7 +1376,7 @@ async function executeTurn(moveIdx) {
       // Moonlight heal on switch-in
       applyMoonlightHeal(newOpp, oppTeam, 'opponent');
       // Player gets free attack
-      await delay(400);
+      await delay(1000);
       await executeAbility(p, opponent(), playerAb);
       if (opponent().fainted) { await handleFaint('opponent'); }
       if (!p.fainted) await tickStatus(p);
@@ -1449,7 +1449,7 @@ async function executeTurn(moveIdx) {
       if (second.flinched) {
         log(`${second.name} flinched and can't move!`, 'status');
       } else {
-        await delay(300);
+        await delay(800);
         await executeAbility(second, first, secondAb);
         if (first.fainted) await handleFaint(first === p ? 'player' : 'opponent');
         if (second.fainted) await handleFaint(second === p ? 'player' : 'opponent');
@@ -1911,7 +1911,7 @@ async function executeAbility(attacker, defender, ability) {
       const missChance = attacker.blindStacks * 0.15;
       if (Math.random() < missChance) {
         attacker.blindStacks--;
-        atkSprite.classList.add('attacking'); await delay(150); atkSprite.classList.remove('attacking');
+        atkSprite.classList.add('attacking'); await delay(1000); atkSprite.classList.remove('attacking');
         log(`  ${label ? label + ': ' : ''}${atkName} misses through the blind! (${attacker.blindStacks} stacks left)`, 'miss');
         updateHpBar(isPlayer ? 'player' : 'opponent');
         return 0;
@@ -1922,7 +1922,7 @@ async function executeAbility(attacker, defender, ability) {
     if (defender.swerveActive && !hitAbility.heal && !hitAbility.swerve && !hitAbility.grantWhittle) {
       const dodgeChance = defender.swerveActive === 'high' ? 1.0 : 0.2;
       if (Math.random() < dodgeChance) {
-        atkSprite.classList.add('attacking'); await delay(150); atkSprite.classList.remove('attacking');
+        atkSprite.classList.add('attacking'); await delay(1000); atkSprite.classList.remove('attacking');
         log(`  ${label ? label + ': ' : ''}${defName} swerves out of the way!`, 'miss');
         // Guerilla Fighter: switch out on dodge
         if (defender.stance?.passive === 'guerillaSwitchOut' && !window.TESTING_1V1) {
@@ -1932,8 +1932,8 @@ async function executeAbility(attacker, defender, ability) {
       }
     }
 
-    atkSprite.classList.add('attacking'); await delay(150); atkSprite.classList.remove('attacking');
-    defSprite.classList.add('hit'); await delay(300); defSprite.classList.remove('hit');
+    atkSprite.classList.add('attacking'); await delay(1000); atkSprite.classList.remove('attacking');
+    defSprite.classList.add('hit'); await delay(500); defSprite.classList.remove('hit');
 
     let result, dmg;
     if (hitAbility.splitDamage) {
@@ -2207,7 +2207,7 @@ async function executeAbility(attacker, defender, ability) {
     // Tump Up: first hit normal, second hit deals more damage
     await dealHit(ability, 'First hit');
     if (!defender.fainted) {
-      await delay(200);
+      await delay(500);
       if (Math.random() < 0.3) {
         log(`  Second hit misses!`, 'miss');
       } else {
@@ -2432,7 +2432,7 @@ async function handleFaint(who) {
 
   renderRoster(who);
 
-  await delay(600);
+  await delay(1000);
 
   // Include current slot in alive check if the unit there is alive (e.g. Druid restored after boar death)
   const ownerReturned = !b.fainted || (team[active] && !team[active].fainted && team[active] !== b);
@@ -2472,7 +2472,7 @@ async function handleFaint(who) {
     renderActiveInfo(who); renderRoster(who);
   }
 
-  await delay(400);
+  await delay(1000);
 }
 
 function checkWin() {
@@ -2515,7 +2515,7 @@ function showDmgFloat(who, amount, isCrit, isHeal) {
   el.style.left = (30 + Math.random() * 40) + 'px';
   el.style.top = '20px';
   area.appendChild(el);
-  setTimeout(() => el.remove(), 1000);
+  setTimeout(() => el.remove(), 1500);
   // Red flash + screen shake on crit
   if (isCrit && !isHeal) {
     const overlay = document.createElement('div');
