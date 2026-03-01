@@ -2516,13 +2516,25 @@ function showDmgFloat(who, amount, isCrit, isHeal) {
   el.style.top = '20px';
   area.appendChild(el);
   setTimeout(() => el.remove(), 1000);
-  // Red flash on crit
+  // Red flash + screen shake on crit
   if (isCrit && !isHeal) {
     const overlay = document.createElement('div');
     overlay.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(200,30,30,0.25);pointer-events:none;z-index:9999;transition:opacity 0.4s;';
     document.body.appendChild(overlay);
     setTimeout(() => { overlay.style.opacity = '0'; }, 50);
     setTimeout(() => overlay.remove(), 500);
+    // Screen shake
+    document.body.style.transition = 'none';
+    const frames = [
+      { x: -4, y: 3 }, { x: 5, y: -2 }, { x: -3, y: -4 },
+      { x: 4, y: 2 }, { x: -2, y: 3 }, { x: 0, y: 0 }
+    ];
+    let i = 0;
+    const shakeInterval = setInterval(() => {
+      if (i >= frames.length) { clearInterval(shakeInterval); document.body.style.transform = ''; return; }
+      document.body.style.transform = `translate(${frames[i].x}px, ${frames[i].y}px)`;
+      i++;
+    }, 40);
   }
 }
 
