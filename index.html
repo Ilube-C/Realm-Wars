@@ -426,7 +426,7 @@ const ABILITIES = {
   lichLifeDrain:{ name:'Life Drain',      dmgType:'magical',  stat:'int', fixed:7,  dice:[1,8],  acc:0,  uses:10, desc:'Siphon life force from the target. Heals proportion of damage dealt.', drain:0.5 },
   shatter:      { name:'Shatter',         dmgType:'physical', stat:'atk', fixed:16, dice:[2,8],  acc:1,  uses:6,  desc:'Shatter a frozen target into pieces. Physical — strong vs low DEF, weak vs tanks. ONLY works on frozen enemies.', requiresFrozen:true },
   // PIT DWELLER ABILITIES
-  tumpUp:       { name:'Tump Up',        dmgType:'physical', stat:'atk', fixed:7,  dice:[1,6],  acc:1,  uses:16, desc:'Hits twice. Second hit deals more damage but can miss.', doubleHit:true },
+  tumpUp:       { name:'Tump Up',        dmgType:'physical', stat:'atk', fixed:5,  dice:[1,6],  acc:1,  uses:16, desc:'Hits twice. Second hit deals more damage but can miss.', doubleHit:true },
   counterThrow: { name:'Counter Throw',  dmgType:'physical', stat:'atk', fixed:7,  dice:[1,6],  acc:0,  uses:10, desc:'Act with reduced speed. Deals 75% bonus damage if opponent already hit you this turn.', counterMove:true },
   subdue:       { name:'Subdue',         dmgType:'physical', stat:'atk', fixed:12, dice:[1,6],  acc:1,  uses:12, desc:'Pin the opponent down. Prevents them from switching next turn.', lockSwitch:true },
   deathLust:    { name:'Death Lust',     dmgType:'physical', stat:'atk', fixed:6,  dice:[1,4],  acc:99, uses:4,  desc:'Enter a frenzy. Adds +5 flat soul damage per hit for 3 turns. Doubled on multi-hit moves. Lost on switching.', grantDeathLust:true },
@@ -509,7 +509,7 @@ const CLASSES = [
         statBoosts:{def:2}, passive:'flashyBlind' },
     ]},
   { id:'pitDweller', label:'Berserker', fixedName:'Pit Dweller', color:'#8a4422',
-    statWeights:{atk:5,spd:1.5,con:4,int:0.5,def:2,cha:1},
+    statWeights:{atk:5,spd:1.5,con:3,int:0.5,def:2,cha:1},
     abilities:['tumpUp','counterThrow','subdue','deathLust'], sprite:'barbarian',
     stances: [
       { id:'dirtyBoxing', name:'Dirty Boxing', desc:'CON+2. Dealing damage has a chance to stun opponent.',
