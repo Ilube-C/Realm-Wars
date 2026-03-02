@@ -742,7 +742,7 @@ function createCombatant(cls, level) {
     abilities: cls.abilities.map(k => ({...ABILITIES[k], key:k, currentUses: ABILITIES[k].uses})),
     status: null, statusTurns: 0, fainted: false,
     stance: null, stances: cls.stances || null,
-    switchLocked: false, deathLustTurns: 0, damagedThisTurn: false,
+    switchLocked: false, switchLockTurns: 0, deathLustTurns: 0, damagedThisTurn: false,
     blindStacks: 0, healingPrayerPending: false, makeWaySwitch: false, defBonusThisTurn: 0,
     boomerangHits: [], burnStacks: 0, swerveActive: false, swerveLastTurn: false, whittleBoost: 0, flinched: false, poisonStacks: 0,
     bladeTossCooldown: false, duelistStacks: 0, shieldBashActive: false, shieldBashDef: 0, shieldBashSpd: 0, woundedStacks: 0,
@@ -1280,6 +1280,7 @@ function clearEffectsOnSwitchOut(unit) {
   if (unit.whittleBoost) { unit.stats.atk -= unit.whittleBoost; unit.whittleBoost = 0; }
   if (unit.duelistStacks) { unit.stats.atk -= unit.duelistStacks; unit.duelistStacks = 0; }
   if (unit.woundedStacks > 0) { unit.woundedStacks--; log(`${unit.name} shakes off a wound on switch-out (${unit.woundedStacks} remaining).`, 'info'); }
+  unit.switchLocked = false; unit.switchLockTurns = 0;
   unit.swerveActive = false; unit.swerveLastTurn = false;
   unit.bladeTossCooldown = false;
   removeStance(unit);
@@ -2084,9 +2085,10 @@ async function executeAbility(attacker, defender, ability) {
       renderRoster(isPlayer ? 'player' : 'opponent');
     }
 
-    // Subdue: lock opponent's switch
+    // Subdue: lock opponent's switch for next turn
     if (hitAbility.lockSwitch) {
       defender.switchLocked = true;
+      defender.switchLockTurns = 2; // decrements at end of this turn and next — clears after next turn
       log(`  ${defName} is pinned! Can't switch next turn.`, 'status');
     }
 
@@ -2320,8 +2322,11 @@ async function tickStatus(battler) {
     }
   }
 
-  // Clear switch lock at end of turn
-  battler.switchLocked = false;
+  // Switch lock lasts 1 full turn: set → decrement → clear
+  if (battler.switchLockTurns > 0) {
+    battler.switchLockTurns--;
+    if (battler.switchLockTurns <= 0) battler.switchLocked = false;
+  }
   battler.lookAtMeLocked = false;
 
   // Clear flinch
